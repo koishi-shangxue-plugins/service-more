@@ -9,7 +9,9 @@
 
 ## 说明
 
-数据库文件默认存放于 `data/database/koishi.json`
+数据库文件默认存放于 `data/database/jsondb/*.json`
+
+json文件会以表的名称命名
 
 ## 使用方法
 

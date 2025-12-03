@@ -1,6 +1,6 @@
 import { Context, Schema, Driver, Query, Selection, Dict, deepEqual, executeUpdate, Eval } from 'koishi';
 import { promises as fs } from 'node:fs';
-import { resolve, dirname } from 'node:path';
+import { resolve } from 'node:path';
 
 // 获取对象的嵌套属性值
 function get(obj: any, path: string)
@@ -70,9 +70,9 @@ class JsonDBDriver extends Driver
   static name = 'jsondb';
   static inject = ['logger'];
 
-  private _path: string;
-  private store: Dict<any[]> = Object.create(null);
-  private _debounce: NodeJS.Timeout | null = null;
+  private _path: string; // 数据库目录路径
+  private store: Dict<any[]> = Object.create(null); // 内存中的数据存储
+  private _debounceTimers: Dict<NodeJS.Timeout> = Object.create(null); // 按表防抖写入的计时器
   private _transactionalStore: Dict<any[]> | null = null; // 用于事务的临时存储
 
   constructor(public ctx: Context, public config: JsonDBDriver.Config)
@@ -85,21 +85,29 @@ class JsonDBDriver extends Driver
   async start()
   {
     // 确保目录存在
-    await fs.mkdir(dirname(this._path), { recursive: true });
+    await fs.mkdir(this._path, { recursive: true });
     try
     {
-      // 读取并解析数据库文件
-      const data = await fs.readFile(this._path, 'utf8');
-      if (data) this.store = JSON.parse(data);
+      // 读取目录下所有的 .json 文件
+      const files = await fs.readdir(this._path);
+      for (const file of files)
+      {
+        if (file.endsWith('.json'))
+        {
+          const tableName = file.slice(0, -5);
+          try
+          {
+            const data = await fs.readFile(resolve(this._path, file), 'utf8');
+            if (data) this.store[tableName] = JSON.parse(data);
+          } catch (err)
+          {
+            this.logger.warn('failed to read table %s: %s', tableName, err);
+          }
+        }
+      }
     } catch (err)
     {
-      if (err.code === 'ENOENT')
-      {
-        this.logger.info('creating new database file: %c', this._path);
-      } else
-      {
-        this.logger.warn('failed to read database file: %s', err);
-      }
+      this.logger.warn('failed to read database directory: %s', err);
     }
     // 监听 dispose 事件，确保程序退出时保存数据
     this.ctx.on('dispose', () => this.stop());
@@ -107,44 +115,66 @@ class JsonDBDriver extends Driver
 
   async stop()
   {
-    if (this._debounce)
+    // 停止时，将所有待写入的表立即写入磁盘
+    const tables = Object.keys(this._debounceTimers);
+    if (tables.length > 0)
     {
-      clearTimeout(this._debounce);
-      await this.flush();
+      await Promise.all(tables.map(table =>
+      {
+        clearTimeout(this._debounceTimers[table]);
+        return this.flushTable(table);
+      }));
     }
   }
 
-  // 立即写入磁盘
-  private async flush()
+  // 立即将单个表写入磁盘
+  private async flushTable(table: string)
   {
-    this._debounce = null;
+    delete this._debounceTimers[table];
     // 如果在事务中，则不执行写入操作
     if (this._transactionalStore) return;
+
+    const tablePath = resolve(this._path, `${table}.json`);
     try
     {
-      await fs.writeFile(this._path, JSON.stringify(this.store, null, 2));
+      const tableData = this.store[table];
+      if (tableData)
+      {
+        // 如果表有数据，则写入文件
+        await fs.writeFile(tablePath, JSON.stringify(tableData, null, 2));
+      } else
+      {
+        // 如果表数据已不存在（被 drop），则删除对应的文件
+        await fs.unlink(tablePath).catch(err =>
+        {
+          // 如果文件本身就不存在，忽略错误
+          if (err.code !== 'ENOENT') throw err;
+        });
+      }
     } catch (err)
     {
-      this.logger.warn('failed to write database file: %s', err);
+      this.logger.warn('failed to write table %s: %s', table, err);
     }
   }
 
   // 防抖写入
-  private write()
+  private write(table: string)
   {
-    if (this._debounce) clearTimeout(this._debounce);
-    this._debounce = setTimeout(() => this.flush(), 1000);
+    if (this._debounceTimers[table]) clearTimeout(this._debounceTimers[table]);
+    this._debounceTimers[table] = setTimeout(() => this.flushTable(table), 1000);
   }
 
   async drop(table: string)
   {
     const store = this._transactionalStore || this.store;
     delete store[table];
-    this.write();
+    this.write(table);
   }
 
   async dropAll()
   {
+    const store = this._transactionalStore || this.store;
+    const tables = Object.keys(store);
     if (this._transactionalStore)
     {
       this._transactionalStore = Object.create(null);
@@ -152,28 +182,49 @@ class JsonDBDriver extends Driver
     {
       this.store = Object.create(null);
     }
-    this.write();
+    // 将所有旧的表标记为待删除
+    for (const table of tables)
+    {
+      this.write(table);
+    }
   }
 
   async stats()
   {
     const stats: Driver.Stats = { size: 0, tables: {} };
+    let totalSize = 0;
     try
     {
-      const fileStats = await fs.stat(this._path);
-      stats.size = fileStats.size;
-    } catch { /* file does not exist */ }
-
-    const store = this._transactionalStore || this.store;
-    for (const name in store)
+      const files = await fs.readdir(this._path);
+      await Promise.all(files.map(async (file) =>
+      {
+        if (file.endsWith('.json'))
+        {
+          const tablePath = resolve(this._path, file);
+          try
+          {
+            const fileStats = await fs.stat(tablePath);
+            totalSize += fileStats.size;
+            const tableName = file.slice(0, -5);
+            // _indexes 是内部表，不计入
+            if (tableName !== '_indexes')
+            {
+              stats.tables[tableName] = {
+                count: (this._transactionalStore || this.store)[tableName]?.length || 0,
+                size: fileStats.size,
+              };
+            }
+          } catch { /* a file may be deleted during stats() */ }
+        }
+      }));
+    } catch (err)
     {
-      if (name === '_indexes') continue;
-      stats.tables[name] = {
-        count: store[name].length,
-        // 计算单表序列化后的大致字节数
-        size: Buffer.from(JSON.stringify(store[name])).length,
-      };
+      if (err.code !== 'ENOENT')
+      {
+        this.logger.warn('failed to read database stats: %s', err);
+      }
     }
+    stats.size = totalSize;
     return stats;
   }
 
@@ -305,7 +356,7 @@ class JsonDBDriver extends Driver
       }
     });
 
-    if (modifiedCount > 0) this.write();
+    if (modifiedCount > 0) this.write(table);
     return { matched: matchedCount, modified: modifiedCount };
   }
 
@@ -327,7 +378,7 @@ class JsonDBDriver extends Driver
     if (removedCount > 0)
     {
       store[table as string] = newTableData;
-      this.write();
+      this.write(table);
     }
     return { matched: removedCount, removed: removedCount };
   }
@@ -350,7 +401,7 @@ class JsonDBDriver extends Driver
     }
 
     tableData.push(newRow);
-    this.write();
+    this.write(table);
     return newRow;
   }
 
@@ -400,7 +451,7 @@ class JsonDBDriver extends Driver
       }
     }
 
-    if (result.inserted > 0 || result.modified > 0) this.write();
+    if (result.inserted > 0 || result.modified > 0) this.write(table);
     return result;
   }
   async withTransaction(callback: () => Promise<void>)
@@ -416,9 +467,17 @@ class JsonDBDriver extends Driver
     try
     {
       await callback();
-      // 提交事务
+      // 提交事务，找出变更的表并写入
+      const oldStore = this.store;
       this.store = this._transactionalStore;
-      this.write();
+      const allKeys = new Set([...Object.keys(oldStore), ...Object.keys(this.store)]);
+      for (const table of allKeys)
+      {
+        if (!deepEqual(oldStore[table], this.store[table]))
+        {
+          this.write(table);
+        }
+      }
     } finally
     {
       // 结束事务
@@ -445,7 +504,7 @@ class JsonDBDriver extends Driver
       return;
     }
     tableIndexes.push({ ...index, name });
-    this.write();
+    this.write('_indexes');
   }
 
   async dropIndex(table: string, name: string): Promise<void>
@@ -457,7 +516,7 @@ class JsonDBDriver extends Driver
     if (indexPos !== -1)
     {
       tableIndexes.splice(indexPos, 1);
-      this.write();
+      this.write('_indexes');
     }
   }
 }
@@ -471,9 +530,9 @@ namespace JsonDBDriver
 
   export const Config: Schema<Config> = Schema.object({
     path: Schema.path({
-      filters: ['file'],
+      filters: ['directory'], // 改为目录
       allowCreate: true,
-    }).description('数据库文件的路径。').default('data/database/koishi.json'),
+    }).description('数据库目录的路径。').default('data/database/jsondb'), // 修改默认路径
   });
 }
 
