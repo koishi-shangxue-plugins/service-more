@@ -530,9 +530,9 @@ namespace JsonDBDriver
 
   export const Config: Schema<Config> = Schema.object({
     path: Schema.path({
-      filters: ['directory'], // 改为目录
+      filters: ['directory'],
       allowCreate: true,
-    }).description('数据库目录的路径。').default('data/database/jsondb'), // 修改默认路径
+    }).description('数据库目录的路径。').default('data/database/jsondb'),
   });
 }
 
