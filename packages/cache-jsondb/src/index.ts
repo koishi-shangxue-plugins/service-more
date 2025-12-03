@@ -1,6 +1,6 @@
 import { Awaitable, Context, Dict, Schema, Service } from 'koishi'
 import { promises as fs } from 'node:fs'
-import { resolve } from 'node:path'
+import { dirname, resolve } from 'node:path'
 
 declare module 'koishi' {
   interface Context {
@@ -40,30 +40,58 @@ abstract class Cache extends Service {
 class JsonDBCache extends Cache {
   private _path: string
   private store: Dict<Dict<any>> = Object.create(null)
+  private _debounce: NodeJS.Timeout | null = null
 
   constructor(protected ctx: Context, public config: JsonDBCache.Config) {
     super(ctx)
     this._path = resolve(ctx.baseDir, config.path)
     this.init()
+
+    // 插件卸载时，如果存在未写入的变更，则立即写入
+    ctx.on('dispose', () => {
+      if (this._debounce) {
+        clearTimeout(this._debounce)
+        return this.flush()
+      }
+    })
   }
 
   private async init() {
     try {
+      // 确保缓存目录存在，避免写入时报错
+      await fs.mkdir(dirname(this._path), { recursive: true })
       const data = await fs.readFile(this._path, 'utf8')
-      this.store = JSON.parse(data)
+      // 文件为空则无需解析
+      if (!data) return
+      try {
+        this.store = JSON.parse(data)
+      } catch (e) {
+        this.ctx.logger('cache').warn('failed to parse cache file: %s', e)
+      }
     } catch (err) {
-      if (err.code !== 'ENOENT') {
+      if (err.code === 'ENOENT') {
+        // 文件不存在是正常情况，首次写入时会自动创建
+      } else {
         this.ctx.logger('cache').warn('failed to read cache file: %s', err)
       }
     }
   }
 
-  private async write() {
+  // 立即写入磁盘
+  private async flush() {
+    this._debounce = null
     try {
-      await fs.writeFile(this._path, JSON.stringify(this.store))
+      // 美化输出，方便调试
+      await fs.writeFile(this._path, JSON.stringify(this.store, null, 2))
     } catch (err) {
       this.ctx.logger('cache').warn('failed to write cache file: %s', err)
     }
+  }
+
+  // 防抖写入，减少IO操作
+  private write() {
+    if (this._debounce) clearTimeout(this._debounce)
+    this._debounce = setTimeout(() => this.flush(), 1000)
   }
 
   private table(name: string): Dict<any> {
@@ -72,7 +100,7 @@ class JsonDBCache extends Cache {
 
   async clear(name: string) {
     delete this.store[name]
-    await this.write()
+    this.write()
   }
 
   async get(name: string, key: string) {
@@ -84,13 +112,13 @@ class JsonDBCache extends Cache {
     // jsondb cache does not support maxAge
     const table = this.table(name)
     table[key] = value
-    await this.write()
+    this.write()
   }
 
   async delete(name: string, key: string) {
     const table = this.table(name)
     delete table[key]
-    await this.write()
+    this.write()
   }
 
   async* keys(table: string) {
