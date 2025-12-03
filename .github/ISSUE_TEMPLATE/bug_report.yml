@@ -1,0 +1,153 @@
+name: 🔴 Bug 反馈 (Bug Report)
+description: 提交一个关于 service-more 插件的 Bug 报告
+title: "[Bug]: "
+labels: ["bug"]
+assignees: []
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢您反馈 Bug！为了帮助我们更快地定位和解决问题，请提供以下信息：
+
+  - type: input
+    id: plugin-name
+    attributes:
+      label: 使用的插件名称
+      description: 请提供出现 Bug 的插件名称
+      placeholder: 例如：koishi-plugin-example
+    validations:
+      required: true
+
+  - type: input
+    id: plugin-version
+    attributes:
+      label: 插件的版本号
+      description: 请提供您使用的插件版本号，例如 v1.2.3
+      placeholder: v1.2.3
+    validations:
+      required: false
+
+  - type: textarea
+    id: koishi-webui-env
+    attributes:
+      label: koishi webUI 的环境信息
+      description: 请提供 `koishi webUI` 的环境信息，您可以在 `koishi webUI` 的 左下角找到。例如：koishi 版本、操作系统版本等。请使用代码块包裹 (```)。
+      placeholder: |
+        ```
+        System:
+            OS: Windows 10 10.0.19045
+            CPU: (16) x64 12th Gen Intel(R) Core(TM) i5-12500H
+
+        Binaries:
+            Node: 22.9.0
+            Yarn: 4.5.3
+
+        Koishi:
+            Core: 4.18.7
+            Console: 5.30.7
+        ...
+        ```
+    validations:
+      required: false
+
+  - type: textarea
+    id: koishi-webui-deps
+    attributes:
+      label: koishi webUI 的依赖列表（可选）
+      description: 请提供 `koishi webUI` 的依赖列表，您可以在 `koishi webUI` 的`依赖管理`找到依赖信息。 如果不清楚，可以留空。请使用代码块包裹 (```)。
+      placeholder: |
+        ```
+        @koishijs/plugin-server	3.2.4 (最新)
+        @koishijs/plugin-server-satori	2.9.0 (最新)
+        @koishijs/plugin-server-temp	1.5.0 (最新)
+        @koishijs/plugin-status	7.4.10 (最新)
+        koishi	4.18.7 (最新)
+        koishi-plugin-android	0.0.1 (最新)
+        ...
+        ```
+    validations:
+      required: false
+
+  - type: input
+    id: koishi-adapter-protocol
+    attributes:
+      label: 使用的 Koishi 适配器或协议
+      description: 请提供您使用的 Koishi 适配器或协议，例如：onebot, discord, telegram 或者具体的协议实现端等。请使用代码块包裹 (```)。
+      placeholder: 例如：qq
+    validations:
+      required: false
+
+  - type: textarea
+    id: describe-bug
+    attributes:
+      label: 请详细描述你遇到的 Bug
+      description: 尽可能详细地描述 Bug 的现象。
+      placeholder: 我在使用 XXX 功能时，遇到了 XXX 问题...
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction-steps
+    attributes:
+      label: 复现步骤
+      description: 请提供清晰的复现步骤，方便我们重现问题。
+      placeholder: |
+        ```
+        1. 打开 XXX 功能
+        2. 点击 XXX 按钮
+        3. 出现错误...
+        ...
+        ```
+    validations:
+      required: false
+
+  - type: textarea
+    id: expected-behavior
+    attributes:
+      label: 预期行为
+      description: 你期望发生什么？
+      placeholder: 我期望 xxx 后应该...
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual-behavior
+    attributes:
+      label: 实际行为
+      description: 实际发生了什么？
+      placeholder: 实际上 xxx 后却...
+    validations:
+      required: true
+
+  - type: textarea
+    id: error-log
+    attributes:
+      label: 完整的报错日志
+      description: 如果有报错信息，请提供完整的报错日志，这对于排查问题非常重要。请将日志粘贴到这里。请使用代码块包裹 (```)。
+      placeholder: |
+        ```
+        [ERROR] 2023-10-27 10:00:00 ...
+        ...
+        ```
+    validations:
+      required: false
+
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: 截图 (可选)
+      description: 如果可以，请提供 Bug 的截图，这有助于我们更好地理解问题。请将截图粘贴或拖拽到这里。
+      placeholder: 请将截图粘贴或拖拽到这里
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: check-list
+    attributes:
+      label: 检查清单
+      description: 提交前请检查以下事项
+      options:
+        - label: 我已经确认这是 service-more 插件的 Bug，而不是 Koishi 主框架、其他插件或其他无关的问题。
+        - label: 我已经提供了足够的信息来重现问题。
+        - label: 我已经尽力提供了详细的报错日志和截图 (如果有)。

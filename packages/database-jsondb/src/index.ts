@@ -1,4 +1,4 @@
-import { Context, Schema, Driver, Model, Query, Selection, Dict, Logger, deepEqual, executeUpdate, Eval } from 'koishi';
+import { Context, Schema, Driver, Query, Selection, Dict, deepEqual, executeUpdate, Eval } from 'koishi';
 import { promises as fs } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 
