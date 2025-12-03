@@ -1,0 +1,61 @@
+{
+  "name": "koishi-plugin-logger-logs",
+  "description": "Dump log files for Koishi",
+  "version": "0.1.0",
+  "main": "lib/index.js",
+  "typings": "lib/index.d.ts",
+  "files": [
+    "lib",
+    "dist",
+    "client",
+    "src"
+  ],
+  "license": "AGPL-3.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/koishi-shangxue-plugins/service-more.git"
+  },
+  "bugs": {
+    "url": "https://github.com/koishi-shangxue-plugins/service-more/issues"
+  },
+  "homepage": "https://github.com/koishi-shangxue-plugins/service-more",
+  "keywords": [
+    "bot",
+    "chatbot",
+    "koishi",
+    "plugin",
+    "logs"
+  ],
+  "koishi": {
+    "public": [
+      "dist"
+    ],
+    "description": {
+      "en": "Dump log files and show them in the console",
+      "zh": "保存日志文件并在控制台中显示"
+    },
+    "service": {
+      "optional": [
+        "console"
+      ]
+    }
+  },
+  "peerDependencies": {
+    "@koishijs/plugin-console": "^5.30.10",
+    "koishi": "^4.18.9"
+  },
+  "peerDependenciesMeta": {
+    "@koishijs/plugin-console": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@koishijs/client": "^5.30.10",
+    "ansi_up": "^5.2.1",
+    "koishi": "^4.18.9",
+    "reggol": "^1.7.1"
+  },
+  "dependencies": {
+    "@koishijs/console": "^5.30.10"
+  }
+}
