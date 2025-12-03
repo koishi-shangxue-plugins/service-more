@@ -40,5 +40,9 @@
   },
   "peerDependencies": {
     "koishi": "^4.17.1"
+  },
+  "dependencies": {
+    "abstract-level": "^1.0.4",
+    "level": "^8.0.1"
   }
 }
