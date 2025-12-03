@@ -3,7 +3,7 @@ import { DataService } from '@koishijs/plugin-console';
 import { resolve } from 'path';
 import { mkdir, readdir, rm } from 'fs/promises';
 import { FileWriter } from './file';
-import zhCN from './locales/zh-CN.yml';
+import zhCN from './../locales/zh-CN.json';
 
 declare module '@koishijs/plugin-console' {
   namespace Console
