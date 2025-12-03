@@ -46,21 +46,34 @@ export interface Config
   root?: string;
   maxAge?: number;
   maxSize?: number;
+  levels?: Dict<number>;
 }
 
 export const Config: Schema<Config> = Schema.object({
   root: Schema.path({
     filters: ['directory'],
     allowCreate: true,
-  }).default('data/logs'),
-  maxAge: Schema.natural().default(30),
-  maxSize: Schema.natural().default(1024 * 100),
+  }).description('日志的存储路径。').default('data/logs'),
+  maxAge: Schema.natural().description('日志文件的最大保留时间（天）。').default(30),
+  maxSize: Schema.natural().description('单个日志文件的最大尺寸（字节）。').default(1024 * 100),
+  levels: Schema.dict(Schema.natural()).description('指定模块的输出等级。'),
 }).i18n({
   'zh-CN': zhCN,
 });
 
 export async function apply(ctx: Context, config: Config)
 {
+  // 保存原始的日志等级配置
+  const originalLevels: Dict<Logger.Level> = {};
+  const loggerNames = Object.keys(config.levels ?? {});
+
+  // 应用新的日志等级配置
+  for (const name of loggerNames)
+  {
+    originalLevels[name] = Logger.levels[name];
+    Logger.levels[name] = config.levels[name];
+  }
+
   const root = resolve(ctx.baseDir, config.root);
   await mkdir(root, { recursive: true });
 
@@ -148,6 +161,12 @@ export async function apply(ctx: Context, config: Config)
     if (loader)
     {
       loader.prolog = [];
+    }
+
+    // 恢复原始的日志等级配置
+    for (const name of loggerNames)
+    {
+      Logger.levels[name] = originalLevels[name];
     }
   });
 
