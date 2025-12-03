@@ -10,8 +10,6 @@
     "esModuleInterop": true,
     "moduleResolution": "node",
     "strictBindCallApply": true,
-    "types": [
-      "yml-register/types",
-    ],
+    "types": [],
   },
 }

@@ -1,0 +1,30 @@
+{
+  "name": "koishi-plugin-cache-jsondb",
+  "description": "JSON DB cache service for Koishi",
+  "version": "1.0.0",
+  "main": "lib/index.js",
+  "typings": "lib/index.d.ts",
+  "files": [
+    "lib",
+    "src"
+  ],
+  "author": "your-name",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/koishi-shangxue-plugins/cache-more.git"
+  },
+  "bugs": {
+    "url": "https://github.com/koishi-shangxue-plugins/cache-more/issues"
+  },
+  "homepage": "https://github.com/koishi-shangxue-plugins/cache-more/tree/main/packages/jsondb#readme",
+  "keywords": [
+    "koishi",
+    "plugin",
+    "cache",
+    "jsondb"
+  ],
+  "peerDependencies": {
+    "koishi": "^4.17.0"
+  }
+}
