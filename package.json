@@ -2,7 +2,6 @@
   "name": "@root/cache-more",
   "version": "0.0.0",
   "private": true,
-  "type": "module",
   "workspaces": [
     "external/*",
     "packages/*"
@@ -13,6 +12,6 @@
     "bump": "yakumo version",
     "dep": "yakumo upgrade",
     "pub": "yakumo publish",
-    "lint": "eslint packages --ext=ts --cache"
+    "postinstall": "node scripts/patch-tsconfig.js"
   }
 }
