@@ -93,7 +93,10 @@ class JsonDBDriver extends Driver
       if (data) this.store = JSON.parse(data);
     } catch (err)
     {
-      if (err.code !== 'ENOENT')
+      if (err.code === 'ENOENT')
+      {
+        this.logger.info('creating new database file: %c', this._path);
+      } else
       {
         this.logger.warn('failed to read database file: %s', err);
       }
@@ -177,7 +180,11 @@ class JsonDBDriver extends Driver
   async prepare(table: string)
   {
     const store = this._transactionalStore || this.store;
-    store[table as string] ||= [];
+    if (!store[table as string])
+    {
+      this.logger.info('auto creating table %c', table);
+      store[table as string] = [];
+    }
   }
 
   async get(sel: Selection.Immutable)

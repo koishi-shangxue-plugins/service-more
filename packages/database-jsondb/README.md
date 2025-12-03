@@ -13,6 +13,8 @@
 
 ## 使用方法
 
+完整介绍请参考 ->  [koishi.chat/zh-CN/guide/database](https://koishi.chat/zh-CN/guide/database/index.html)
+
 ### 在你的插件中使用
 
 ```typescript
