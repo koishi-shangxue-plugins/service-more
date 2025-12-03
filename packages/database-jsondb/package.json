@@ -22,19 +22,19 @@
     "chatbot",
     "koishi",
     "plugin",
-    "cache",
+    "database",
     "client",
     "storage"
   ],
   "koishi": {
     "category": "storage",
     "description": {
-      "en": "JSON DB Cache Service",
-      "zh": "基于 JSON DB 的缓存服务"
+      "en": "",
+      "zh": ""
     },
     "service": {
       "implements": [
-        "cache"
+        "database"
       ]
     }
   },
@@ -43,8 +43,5 @@
   },
   "devDependencies": {
     "koishi": "^4.17.1"
-  },
-  "dependencies": {
-    "@koishijs/cache": "^2.1.0"
   }
 }
