@@ -37,6 +37,9 @@
     "service": {
       "optional": [
         "console"
+      ],
+      "implements": [
+        "logger"
       ]
     }
   },

@@ -3,8 +3,6 @@ import { DataService } from '@koishijs/plugin-console';
 import { resolve } from 'path';
 import { mkdir, readdir, rm } from 'fs/promises';
 import { FileWriter } from './file';
-import zhCN from './../locales/zh-CN.json';
-
 declare module '@koishijs/plugin-console' {
   namespace Console
   {
@@ -16,6 +14,16 @@ declare module '@koishijs/plugin-console' {
 }
 
 export const name = 'logger';
+
+export const usage = `
+---
+
+方便地修改logger的设置~
+
+灵感来自 https://forum.koishi.xyz/t/topic/6363
+
+---
+`;
 
 class LogProvider extends DataService<Logger.Record[]>
 {
@@ -53,25 +61,32 @@ export const Config: Schema<Config> = Schema.object({
   root: Schema.path({
     filters: ['directory'],
     allowCreate: true,
-  }).default('data/logs'),
-  maxAge: Schema.natural().default(30),
-  maxSize: Schema.natural().default(1024 * 100),
-  levels: Schema.dict(Schema.natural()),
-}).i18n({
-  'zh-CN': zhCN,
+  }).default('data/logs').description('存放输出日志的本地目录。'),
+  maxAge: Schema.natural().description('日志文件保存的最大天数（天）。').default(30),
+  maxSize: Schema.natural().description('单个日志文件的最大大小（字节）。').default(1024 * 100),
+  levels: Schema.dict(Schema.natural().default(3)).description('指定模块的输出等级。<br>示例： 左侧写 `debug`，右侧写 `3`'),
 });
 
 export async function apply(ctx: Context, config: Config)
 {
   // 保存原始的日志等级配置
   const originalLevels: Dict<Logger.Level> = {};
-  const loggerNames = Object.keys(config.levels ?? {});
+  const customLevels = config.levels ?? {};
 
-  // 应用新的日志等级配置
-  for (const name of loggerNames)
+  // 特殊处理 debug 键，将其映射到 base 等级
+  if ('debug' in customLevels)
   {
+    originalLevels['base'] = Logger.levels.base;
+    Logger.levels.base = customLevels['debug'];
+  }
+
+  // 备份并应用其他具名 logger 等级
+  for (const name in customLevels)
+  {
+    // 跳过已经处理过的 debug 键
+    if (name === 'debug') continue;
     originalLevels[name] = Logger.levels[name];
-    Logger.levels[name] = config.levels[name];
+    Logger.levels[name] = customLevels[name];
   }
 
   const root = resolve(ctx.baseDir, config.root);
@@ -163,8 +178,8 @@ export async function apply(ctx: Context, config: Config)
       loader.prolog = [];
     }
 
-    // 恢复原始的日志等级配置
-    for (const name of loggerNames)
+    // 恢复所有被修改过的日志等级
+    for (const name in originalLevels)
     {
       Logger.levels[name] = originalLevels[name];
     }
