@@ -5,3 +5,6 @@
 *.ico -text
 *.gif -text
 *.webp -text
+
+* linguist-vendored
+packages/*/src/** -linguist-vendored
