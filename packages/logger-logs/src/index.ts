@@ -53,10 +53,10 @@ export const Config: Schema<Config> = Schema.object({
   root: Schema.path({
     filters: ['directory'],
     allowCreate: true,
-  }).description('日志的存储路径。').default('data/logs'),
-  maxAge: Schema.natural().description('日志文件的最大保留时间（天）。').default(30),
-  maxSize: Schema.natural().description('单个日志文件的最大尺寸（字节）。').default(1024 * 100),
-  levels: Schema.dict(Schema.natural()).description('指定模块的输出等级。'),
+  }).default('data/logs'),
+  maxAge: Schema.natural().default(30),
+  maxSize: Schema.natural().default(1024 * 100),
+  levels: Schema.dict(Schema.natural()),
 }).i18n({
   'zh-CN': zhCN,
 });
