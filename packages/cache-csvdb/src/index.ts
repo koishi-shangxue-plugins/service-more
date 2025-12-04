@@ -77,16 +77,35 @@ class CsvDBCache extends Cache
       await fs.mkdir(dirname(this._path), { recursive: true });
       const data = await fs.readFile(this._path, 'utf8');
       if (!data) return;
+
+      const unescapeCsvField = (field: string) =>
+      {
+        if (field.startsWith('"') && field.endsWith('"'))
+        {
+          return field.slice(1, -1).replace(/""/g, '"');
+        }
+        return field;
+      };
+
       // 跳过标题行
       for (const line of data.split(/[\r\n]+/).slice(1))
       {
         if (!line) continue;
-        const parts = line.match(/(?:[^,"]|"(?:\\.|[^"])*")+/g);
+        // 使用正则表达式安全地分割 CSV 行
+        const parts = line.match(/(?:"(?:[^"]|"")*"|[^,"]*),?/g);
         if (parts && parts.length >= 3)
         {
-          const [table, key] = parts;
-          const value = JSON.parse(parts[2]);
-          this.table(table)[key] = value;
+          try
+          {
+            // 清理每个部分并移除末尾的逗号
+            const table = unescapeCsvField(parts[0].replace(/,$/, ''));
+            const key = unescapeCsvField(parts[1].replace(/,$/, ''));
+            const value = JSON.parse(unescapeCsvField(parts[2].replace(/,$/, '')));
+            this.table(table)[key] = value;
+          } catch (err)
+          {
+            this.ctx.logger('cache').warn('failed to parse cache line: %s', err);
+          }
         }
       }
     } catch (err)
@@ -101,21 +120,36 @@ class CsvDBCache extends Cache
   private async flush()
   {
     this._debounce = null;
-    let csvContent = 'table,key,value\n';
+
+    const escapeCsvField = (field: string) =>
+    {
+      const str = String(field);
+      // 如果字段包含逗号、引号或换行符，则需要用引号包裹
+      if (/[",\r\n]/.test(str))
+      {
+        // 将字段内的所有引号替换为双引号
+        return `"${str.replace(/"/g, '""')}"`;
+      }
+      return str;
+    };
+
+    const lines = ['table,key,value'];
     for (const tableName in this.store)
     {
       for (const key in this.store[tableName])
       {
         const value = JSON.stringify(this.store[tableName][key]);
-        // 简单的 CSV 转义：这里只处理了逗号和引号，对于复杂情况可能不健壮
-        const escapedKey = `"${key.replace(/"/g, '""')}"`;
-        const escapedValue = `"${value.replace(/"/g, '""')}"`;
-        csvContent += `${tableName},${escapedKey},${escapedValue}\n`;
+        lines.push([
+          escapeCsvField(tableName),
+          escapeCsvField(key),
+          escapeCsvField(value),
+        ].join(','));
       }
     }
+
     try
     {
-      await fs.writeFile(this._path, csvContent);
+      await fs.writeFile(this._path, lines.join('\n'));
     } catch (err)
     {
       this.ctx.logger('cache').warn('failed to write cache file: %s', err);
