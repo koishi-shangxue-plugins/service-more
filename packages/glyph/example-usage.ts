@@ -47,8 +47,8 @@ export function apply(ctx: Context, config: Config)
         return '没有可用的字体';
       }
 
-      // config.font 是字体名称，需要通过 fonts 服务获取 Data URL
-      const fontDataUrl = ctx.fonts.getFontDataUrl(selectedFont);
+      // config.font 是字体名称，需要通过 glyph 服务获取 Data URL
+      const fontDataUrl = ctx.glyph.getFontDataUrl(selectedFont);
 
       if (!fontDataUrl)
       {

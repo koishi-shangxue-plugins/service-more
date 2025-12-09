@@ -109,11 +109,11 @@ interface FontInfo
   size: number;        // 文件大小（字节）
 }
 
-// 声明 fonts 服务
+// 声明 glyph 服务
 declare module 'koishi' {
   interface Context
   {
-    fonts: FontsService;
+    glyph: FontsService;
   }
 }
 
