@@ -253,7 +253,7 @@ export namespace FontsService
       .description('存放字体文件的目录路径'),
 
     fontPreview: Schema.union(fontSchemaOptions).role('radio')
-      .description('字体列表展示（用于预览所有可用字体，无实际功能）')
+      .description('字体列表展示<br>**新添加的字体需要重启koishi生效**<br>> 用于预览所有可用字体，无实际功能')
   });
 }
 
