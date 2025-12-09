@@ -1,6 +1,6 @@
 import { Context, Schema, Service } from 'koishi';
-import { readdirSync, readFileSync, statSync } from 'node:fs';
-import { readdir, readFile, stat, writeFile, mkdir } from 'node:fs/promises';
+import { readdirSync, readFileSync, statSync, existsSync } from 'node:fs';
+import { readdir, readFile, stat, writeFile, mkdir, access } from 'node:fs/promises';
 import { resolve, extname, basename, dirname } from 'node:path';
 
 export const name = 'glyph';
@@ -41,8 +41,16 @@ const SUPPORTED_FORMATS = [
   '.pfb',    // PostScript Type 1 Font (Binary)
 ] as const;
 
+// 字体信息结构
+interface FontListItem
+{
+  name: string;
+  format: string;
+  size: string;
+}
+
 // 读取字体列表
-function loadFontSchemaOptions(): Schema<string, string>[]
+function loadFontList(): { options: Schema<string, string>[]; description: string; }
 {
   try
   {
@@ -50,6 +58,7 @@ function loadFontSchemaOptions(): Schema<string, string>[]
     const files = readdirSync(fontRoot);
 
     const fontOptions: Schema<string, string>[] = [];
+    const fontItems: FontListItem[] = [];
 
     for (const file of files)
     {
@@ -78,24 +87,40 @@ function loadFontSchemaOptions(): Schema<string, string>[]
       fontOptions.push(
         Schema.const(fontName).description(`${fontName} (${format}, ${sizeKB} KB)`)
       );
+
+      fontItems.push({ name: fontName, format, size: sizeKB });
     }
 
-    // 如果没有字体，添加一个默认选项
-    if (fontOptions.length === 0)
+    // 生成字体列表描述
+    let description = '';
+    if (fontItems.length === 0)
     {
+      description = '<br><br>**当前无可用字体**<br>请将字体文件放入 data/fonts 目录';
       fontOptions.push(Schema.const('').description('无可用字体（请将字体文件放入 data/fonts 目录）'));
+    } else
+    {
+      description = '<br><br>**当前可用字体列表：**<br>';
+      for (const item of fontItems)
+      {
+        description += `- ${item.name}<br>`;
+      }
     }
 
-    return fontOptions;
+    return { options: fontOptions, description };
   } catch (err)
   {
     // 如果读取失败（例如目录不存在），返回默认选项
-    return [Schema.const('').description('无可用字体（请将字体文件放入 data/fonts 目录）')];
+    return {
+      options: [Schema.const('').description('无可用字体（请将字体文件放入 data/fonts 目录）')],
+      description: '<br><br>**当前无可用字体**<br>请将字体文件放入 data/fonts 目录'
+    };
   }
 }
 
-// 在模块加载时生成字体选项
-const fontSchemaOptions = loadFontSchemaOptions();
+// 在模块加载时生成字体列表
+const fontListData = loadFontList();
+const fontSchemaOptions = fontListData.options;
+const fontListDescription = fontListData.description;
 
 // 导出字体选项供其他插件使用
 export { fontSchemaOptions as fontlist };
@@ -243,13 +268,31 @@ export class FontsService extends Service
    */
   async checkFont(fontName: string, downloadUrl: string): Promise<boolean>
   {
-    // 检查字体是否已存在
+    // 先检查内存中是否已加载
     if (this.fontMap.has(fontName))
     {
-      this.ctx.logger.debug(`字体已存在: ${fontName}`);
+      this.ctx.logger.debug(`字体已在内存中: ${fontName}`);
       return true;
     }
 
+    // 检查文件系统中是否存在该字体文件（任意支持的格式）
+    for (const ext of SUPPORTED_FORMATS)
+    {
+      const filePath = resolve(this.fontRoot, `${fontName}${ext}`);
+      try
+      {
+        await access(filePath);
+        // 文件存在，加载到内存
+        this.ctx.logger.debug(`字体文件已存在，加载到内存: ${fontName}${ext}`);
+        await this.loadSingleFont(filePath);
+        return true;
+      } catch
+      {
+        // 文件不存在，继续检查下一个格式
+      }
+    }
+
+    // 文件不存在，开始下载
     this.ctx.logger.info(`字体不存在，开始下载: ${fontName} from ${downloadUrl}`);
 
     try
@@ -301,6 +344,40 @@ export class FontsService extends Service
     }
   }
 
+  // 加载单个字体文件到内存
+  private async loadSingleFont(filePath: string): Promise<void>
+  {
+    const file = basename(filePath);
+    const ext = extname(file).toLowerCase();
+    const fontName = basename(file, ext);
+
+    try
+    {
+      const fileStats = await stat(filePath);
+      const buffer = await readFile(filePath);
+
+      // 转换为 Base64 Data URL
+      const base64 = buffer.toString('base64');
+      const mimeType = this.getMimeType(ext);
+      const dataUrl = `data:${mimeType};base64,${base64}`;
+
+      // 存储字体信息
+      const fontInfo: FontInfo = {
+        name: fontName,
+        dataUrl,
+        format: ext.slice(1),
+        size: fileStats.size
+      };
+
+      this.fontMap.set(fontName, fontInfo);
+      this.ctx.logger.debug(`已加载字体: ${fontName} (${ext}, ${(fileStats.size / 1024).toFixed(2)} KB)`);
+    } catch (err)
+    {
+      this.ctx.logger.warn(`加载字体文件失败: ${file}`, err);
+      throw err;
+    }
+  }
+
   // 从 MIME 类型获取文件扩展名
   private getExtensionFromMimeType(mimeType: string): string | null
   {
@@ -336,8 +413,8 @@ export namespace FontsService
       .default('data/fonts')
       .description('存放字体文件的目录路径'),
 
-    fontPreview: Schema.union(fontSchemaOptions).role('radio')
-      .description('字体列表展示<br>**新添加的字体需要重启koishi生效**<br>> 用于预览所有可用字体，无实际功能')
+    fontPreview: Schema.union([]).role('radio')
+      .description(`字体列表展示<br>**新添加的字体需要重启koishi生效**<br>> 用于预览所有可用字体，无实际功能${fontListDescription}`)
   });
 }
 
