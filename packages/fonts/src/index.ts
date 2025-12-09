@@ -182,7 +182,6 @@ export class FontsService extends Service {
 export namespace FontsService {
   export interface Config {
     root: string
-    testFont: string  // 测试配置项
   }
 
   export const Config: Schema<Config> = Schema.object({
@@ -191,10 +190,7 @@ export namespace FontsService {
       allowCreate: true,
     })
       .default('data/fonts')
-      .description('存放字体文件的目录路径'),
-
-    testFont: Schema.union(fontSchemaOptions)
-      .description('测试：选择字体（用于验证静态配置项是否工作）')
+      .description('存放字体文件的目录路径')
   })
 }
 
@@ -205,20 +201,4 @@ export const Config = FontsService.Config
 export function apply(ctx: Context, config: FontsService.Config) {
   // 注册 fonts 服务
   ctx.plugin(FontsService, config)
-
-  // 测试：打印选中的字体
-  // 如果没有选择字体，使用第一个可用字体
-  const selectedFont = config.testFont || ctx.fonts?.getFontNames()[0]
-
-  if (selectedFont) {
-    ctx.logger.info('测试配置项 testFont 的值:', selectedFont)
-
-    // 通过服务获取字体 Data URL
-    const fontDataUrl = ctx.fonts?.getFontDataUrl(selectedFont)
-    if (fontDataUrl) {
-      ctx.logger.info('字体 Data URL 长度:', fontDataUrl.length)
-    } else {
-      ctx.logger.warn('未找到字体:', selectedFont)
-    }
-  }
 }
