@@ -8,20 +8,21 @@
  * 4. 通过 ctx.fonts.getFontDataUrl(config.font) 获取字体的 Base64 Data URL
  */
 
-import { Context, Schema } from 'koishi'
-import { fontlist } from 'koishi-plugin-fonts'
-import { } from 'koishi-plugin-fonts'  // 导入类型声明
+import { Context, Schema } from 'koishi';
+import { fontlist } from 'koishi-plugin-fonts';
+import { } from 'koishi-plugin-fonts';  // 导入类型声明
 
-export const name = 'example-plugin'
+export const name = 'example-plugin';
 
 // 必须注入 fonts 服务才能获取字体 Data URL
 export const inject = {
   required: ['fonts']
-}
+};
 
-export interface Config {
-  font: string  // 这里存储的是字体名称（例如："NotoColorEmoji-Regular"）
-  text: string
+export interface Config
+{
+  font: string;  // 这里存储的是字体名称（例如："NotoColorEmoji-Regular"）
+  text: string;
 }
 
 export const Config: Schema<Config> = Schema.object({
@@ -31,27 +32,31 @@ export const Config: Schema<Config> = Schema.object({
   font: Schema.union(fontlist).description('选择要使用的字体'),
 
   text: Schema.string().default('Hello World').description('要渲染的文本')
-})
+});
 
-export function apply(ctx: Context, config: Config) {
+export function apply(ctx: Context, config: Config)
+{
   ctx.command('test-font')
-    .action(async ({ session }) => {
+    .action(async ({ session }) =>
+    {
       // 如果没有选择字体，使用第一个可用字体
-      const selectedFont = config.font || ctx.fonts.getFontNames()[0]
+      const selectedFont = config.font || ctx.fonts.getFontNames()[0];
 
-      if (!selectedFont) {
-        return '没有可用的字体'
+      if (!selectedFont)
+      {
+        return '没有可用的字体';
       }
 
       // config.font 是字体名称，需要通过 fonts 服务获取 Data URL
-      const fontDataUrl = ctx.fonts.getFontDataUrl(selectedFont)
+      const fontDataUrl = ctx.fonts.getFontDataUrl(selectedFont);
 
-      if (!fontDataUrl) {
-        return `未找到字体: ${selectedFont}`
+      if (!fontDataUrl)
+      {
+        return `未找到字体: ${selectedFont}`;
       }
 
-      ctx.logger.info('选中的字体:', selectedFont)
-      ctx.logger.info('字体 Data URL 长度:', fontDataUrl.length)
+      ctx.logger.info('选中的字体:', selectedFont);
+      ctx.logger.info('字体 Data URL 长度:', fontDataUrl.length);
 
       // 现在可以在 HTML/CSS 中使用这个 Data URL
       // 例如在生成图片时：
@@ -60,11 +65,11 @@ export function apply(ctx: Context, config: Config) {
           font-family: 'CustomFont';
           src: url('${fontDataUrl}');
         }
-      `
+      `;
 
       // 或者在 Canvas 中使用
       // 或者传递给图片生成库等
 
-      return `字体已加载: ${selectedFont}，文本: ${config.text}`
-    })
+      return `字体已加载: ${selectedFont}，文本: ${config.text}`;
+    });
 }

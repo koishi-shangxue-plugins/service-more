@@ -1,20 +1,48 @@
 import { Context, Schema, Service } from 'koishi';
-import { readdirSync, statSync } from 'node:fs';
+import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { readdir, readFile, stat } from 'node:fs/promises';
 import { resolve, extname, basename } from 'node:path';
 
 export const name = 'fonts';
+export const reusable = false;
+export const filter = false;
 
 export const inject = {
   required: [],
   optional: [],
 };
 
-// 默认支持的字体格式
-const DEFAULT_SUPPORTED_FORMATS = ['.ttf', '.otf', '.woff', '.woff2', '.ttc'] as const;
+const readme = readFileSync(resolve(__dirname, '../readme.md'), 'utf-8');
+
+export const usage = `
+---
+
+<details>
+<summary>点击查看插件简介和使用说明</summary>
+<br/>
+${readme}
+</details>
+
+---
+`;
+
+// 支持的字体格式（包含所有常见的字体格式）
+const SUPPORTED_FORMATS = [
+  '.ttf',    // TrueType Font
+  '.otf',    // OpenType Font
+  '.woff',   // Web Open Font Format
+  '.woff2',  // Web Open Font Format 2
+  '.ttc',    // TrueType Collection
+  '.eot',    // Embedded OpenType
+  '.svg',    // SVG Font
+  '.dfont',  // Mac OS X Data Fork Font
+  '.fon',    // Windows Bitmap Font
+  '.pfa',    // PostScript Type 1 Font (ASCII)
+  '.pfb',    // PostScript Type 1 Font (Binary)
+] as const;
 
 // 读取字体列表
-function loadFontSchemaOptions(supportedFormats: readonly string[] = DEFAULT_SUPPORTED_FORMATS): Schema<string, string>[]
+function loadFontSchemaOptions(): Schema<string, string>[]
 {
   try
   {
@@ -28,7 +56,7 @@ function loadFontSchemaOptions(supportedFormats: readonly string[] = DEFAULT_SUP
       const ext = extname(file).toLowerCase();
 
       // 只处理支持的字体格式
-      if (!supportedFormats.includes(ext))
+      if (!SUPPORTED_FORMATS.includes(ext as any))
       {
         continue;
       }
@@ -121,7 +149,7 @@ export class FontsService extends Service
         const ext = extname(file).toLowerCase();
 
         // 只处理支持的字体格式
-        if (!this.config.supportedFormats.includes(ext))
+        if (!SUPPORTED_FORMATS.includes(ext as any))
         {
           continue;
         }
@@ -178,7 +206,13 @@ export class FontsService extends Service
       '.otf': 'font/otf',
       '.woff': 'font/woff',
       '.woff2': 'font/woff2',
-      '.ttc': 'font/collection'
+      '.ttc': 'font/collection',
+      '.eot': 'application/vnd.ms-fontobject',
+      '.svg': 'image/svg+xml',
+      '.dfont': 'application/x-dfont',
+      '.fon': 'application/octet-stream',
+      '.pfa': 'application/x-font-type1',
+      '.pfb': 'application/x-font-type1'
     };
     return mimeTypes[ext.toLowerCase()] || 'application/octet-stream';
   }
@@ -207,7 +241,6 @@ export namespace FontsService
   export interface Config
   {
     root: string;
-    supportedFormats: string[];
     fontPreview: string;
   }
 
@@ -218,10 +251,6 @@ export namespace FontsService
     })
       .default('data/fonts')
       .description('存放字体文件的目录路径'),
-
-    supportedFormats: Schema.array(String).role('table')
-      .default(['.ttf', '.otf', '.woff', '.woff2', '.ttc'])
-      .description('支持的字体格式（包括点号，例如：`.ttf`）'),
 
     fontPreview: Schema.union(fontSchemaOptions).role('radio')
       .description('字体列表展示（用于预览所有可用字体，无实际功能）')
