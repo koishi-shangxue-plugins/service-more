@@ -3,13 +3,14 @@
  *
  * 使用方法：
  * 1. 在你的插件中安装 koishi-plugin-fonts
- * 2. 必须注入 fonts 服务
- * 3. 在配置 Schema 中使用 Schema.dynamic('font')
+ * 2. 导入 fontlist 并在 Schema 中使用
+ * 3. 必须注入 fonts 服务才能获取字体 Data URL
  * 4. 通过 ctx.fonts.getFontDataUrl(config.font) 获取字体的 Base64 Data URL
  */
 
 import { Context, Schema } from 'koishi'
-import { } from 'koishi-plugin-fonts'
+import { fontlist } from 'koishi-plugin-fonts'
+import { } from 'koishi-plugin-fonts'  // 导入类型声明
 
 export const name = 'example-plugin'
 
@@ -24,10 +25,10 @@ export interface Config {
 }
 
 export const Config: Schema<Config> = Schema.object({
-  // 使用 Schema.dynamic('font') 来获取字体列表
+  // 使用 Schema.union(fontlist) 来获取字体列表
   // 用户在 UI 上会看到一个下拉框，包含所有可用的字体
   // 配置项的值是字体名称，不是 Data URL
-  font: Schema.dynamic('font').description('选择要使用的字体'),
+  font: Schema.union(fontlist).description('选择要使用的字体'),
 
   text: Schema.string().default('Hello World').description('要渲染的文本')
 })
