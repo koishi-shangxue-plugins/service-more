@@ -90,7 +90,7 @@ export class FontsService extends Service {
 
           this.fontMap.set(fontName, fontInfo)
 
-          this.ctx.logger.debug(`已加载字体: ${fontName} (${ext}, ${(fileStats.size / 1024).toFixed(2)} KB)`)
+          this.ctx.logger.info(`已加载字体: ${fontName} (${ext}, ${(fileStats.size / 1024).toFixed(2)} KB)`)
         } catch (err) {
           this.ctx.logger.warn(`加载字体文件失败: ${file}`, err)
         }
@@ -123,10 +123,12 @@ export class FontsService extends Service {
       fontOptions.push(Schema.const('').description('无可用字体'))
     }
 
-    // 注册动态配置项 'font'
-    this.ctx.schema.extend('font', Schema.union(fontOptions))
+    // 使用 ctx.schema.set() 注册动态类型
+    // 其他插件可以通过 Schema.dynamic('font') 来引用
+    this.ctx.schema.set('font', Schema.union(fontOptions))
 
-    this.ctx.logger.debug(`已注册 ${fontOptions.length} 个字体到动态配置项`)
+    this.ctx.logger.info(`已注册 ${this.fontMap.size} 个字体选项到动态配置项 'font'`)
+    this.ctx.logger.info('字体列表:', Array.from(this.fontMap.keys()).join(', '))
   }
 
   // 获取字体信息（可选的辅助方法）
