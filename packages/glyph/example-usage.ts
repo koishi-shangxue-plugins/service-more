@@ -2,15 +2,16 @@
  * 这是一个示例文件，展示其他插件如何使用 koishi-plugin-glyph
  *
  * 使用方法：
- * 1. 在你的插件中安装 koishi-plugin-fonts
+ * 1. 在你的插件中安装 koishi-plugin-glyph
  * 2. 导入 fontlist 并在 Schema 中使用
- * 3. 必须注入 fonts 服务才能获取字体 Data URL
- * 4. 通过 ctx.fonts.getFontDataUrl(config.font) 获取字体的 Base64 Data URL
+ * 3. 必须注入 glyph 服务才能获取字体 Data URL
+ * 4. 通过 ctx.glyph.getFontDataUrl(config.font) 获取字体的 Base64 Data URL
+ * 5. 可以使用 ctx.glyph.checkFont() 自动下载并加载字体
  */
 
 import { Context, Schema } from 'koishi';
-import { fontlist } from 'koishi-plugin-glyph';
-import { } from 'koishi-plugin-glyph';  // 导入类型声明
+import { fontlist } from './src/index';
+import type { } from './src/index';  // 导入类型声明
 
 export const name = 'example-plugin';
 
@@ -36,6 +37,23 @@ export const Config: Schema<Config> = Schema.object({
 
 export function apply(ctx: Context, config: Config)
 {
+  // 在插件启动时检查并下载所需字体
+  ctx.on('ready', async () =>
+  {
+    // 示例：检查并下载 Noto Color Emoji 字体
+    const fontExists = await ctx.glyph.checkFont(
+      'NotoColorEmoji-Regular',
+      'https://github.com/googlefonts/noto-emoji/raw/main/fonts/NotoColorEmoji.ttf'
+    );
+
+    if (fontExists)
+    {
+      ctx.logger.info('字体已准备就绪: NotoColorEmoji-Regular');
+    } else
+    {
+      ctx.logger.warn('字体下载失败: NotoColorEmoji-Regular');
+    }
+  });
 
   ctx.command('test-font')
     .action(async ({ session }) =>

@@ -1,7 +1,7 @@
 import { Context, Schema, Service } from 'koishi';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
-import { readdir, readFile, stat } from 'node:fs/promises';
-import { resolve, extname, basename } from 'node:path';
+import { readdir, readFile, stat, writeFile, mkdir } from 'node:fs/promises';
+import { resolve, extname, basename, dirname } from 'node:path';
 
 export const name = 'glyph';
 export const reusable = false;
@@ -234,6 +234,90 @@ export class FontsService extends Service
   {
     return this.fontMap.get(name)?.dataUrl;
   }
+
+  /**
+   * 检查字体是否存在，如果不存在则从指定 URL 下载
+   * @param fontName 字体名称（不含扩展名）
+   * @param downloadUrl 字体文件的下载 URL
+   * @returns 如果字体已存在返回 true，下载成功后也返回 true，失败返回 false
+   */
+  async checkFont(fontName: string, downloadUrl: string): Promise<boolean>
+  {
+    // 检查字体是否已存在
+    if (this.fontMap.has(fontName))
+    {
+      this.ctx.logger.debug(`字体已存在: ${fontName}`);
+      return true;
+    }
+
+    this.ctx.logger.info(`字体不存在，开始下载: ${fontName} from ${downloadUrl}`);
+
+    try
+    {
+      // 使用 ctx.http.file 下载字体文件
+      const response = await this.ctx.http.file(downloadUrl);
+
+      // 从 MIME 类型推断文件扩展名
+      const ext = this.getExtensionFromMimeType(response.type);
+      if (!ext)
+      {
+        this.ctx.logger.warn(`不支持的字体 MIME 类型: ${response.type}`);
+        return false;
+      }
+
+      // 构建保存路径
+      const fileName = `${fontName}${ext}`;
+      const filePath = resolve(this.fontRoot, fileName);
+
+      // 确保目录存在
+      await mkdir(dirname(filePath), { recursive: true });
+
+      // 将 ArrayBuffer 转换为 Buffer 并保存文件
+      const buffer = Buffer.from(response.data);
+      await writeFile(filePath, buffer);
+
+      this.ctx.logger.info(`字体下载成功: ${fileName} (${(buffer.length / 1024).toFixed(2)} KB)`);
+
+      // 转换为 Base64 Data URL
+      const base64 = buffer.toString('base64');
+      const dataUrl = `data:${response.type};base64,${base64}`;
+
+      // 存储字体信息到内存
+      const fontInfo: FontInfo = {
+        name: fontName,
+        dataUrl,
+        format: ext.slice(1), // 去掉开头的点
+        size: buffer.length
+      };
+
+      this.fontMap.set(fontName, fontInfo);
+
+      this.ctx.logger.info(`字体已加载到内存: ${fontName}`);
+      return true;
+    } catch (err)
+    {
+      this.ctx.logger.error(`下载字体失败: ${fontName}`, err);
+      return false;
+    }
+  }
+
+  // 从 MIME 类型获取文件扩展名
+  private getExtensionFromMimeType(mimeType: string): string | null
+  {
+    const mimeToExt: Record<string, string> = {
+      'font/ttf': '.ttf',
+      'font/otf': '.otf',
+      'font/woff': '.woff',
+      'font/woff2': '.woff2',
+      'font/collection': '.ttc',
+      'application/vnd.ms-fontobject': '.eot',
+      'image/svg+xml': '.svg',
+      'application/x-dfont': '.dfont',
+      'application/octet-stream': '.ttf', // 默认使用 ttf
+      'application/x-font-type1': '.pfa'
+    };
+    return mimeToExt[mimeType] || null;
+  }
 }
 
 export namespace FontsService
@@ -263,6 +347,6 @@ export const Config = FontsService.Config;
 // 应用插件
 export function apply(ctx: Context, config: FontsService.Config)
 {
-  // 注册 fonts 服务
+  // 注册 glyph 服务
   ctx.plugin(FontsService, config);
 }
