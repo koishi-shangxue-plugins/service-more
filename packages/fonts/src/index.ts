@@ -207,13 +207,18 @@ export function apply(ctx: Context, config: FontsService.Config) {
   ctx.plugin(FontsService, config)
 
   // 测试：打印选中的字体
-  if (config.testFont) {
-    ctx.logger.info('测试配置项 testFont 的值:', config.testFont)
+  // 如果没有选择字体，使用第一个可用字体
+  const selectedFont = config.testFont || ctx.fonts?.getFontNames()[0]
+
+  if (selectedFont) {
+    ctx.logger.info('测试配置项 testFont 的值:', selectedFont)
 
     // 通过服务获取字体 Data URL
-    const fontDataUrl = ctx.fonts?.getFontDataUrl(config.testFont)
+    const fontDataUrl = ctx.fonts?.getFontDataUrl(selectedFont)
     if (fontDataUrl) {
       ctx.logger.info('字体 Data URL 长度:', fontDataUrl.length)
+    } else {
+      ctx.logger.warn('未找到字体:', selectedFont)
     }
   }
 }

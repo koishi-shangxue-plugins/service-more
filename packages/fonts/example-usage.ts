@@ -36,14 +36,21 @@ export const Config: Schema<Config> = Schema.object({
 export function apply(ctx: Context, config: Config) {
   ctx.command('test-font')
     .action(async ({ session }) => {
-      // config.font 是字体名称，需要通过 fonts 服务获取 Data URL
-      const fontDataUrl = ctx.fonts.getFontDataUrl(config.font)
+      // 如果没有选择字体，使用第一个可用字体
+      const selectedFont = config.font || ctx.fonts.getFontNames()[0]
 
-      if (!fontDataUrl) {
-        return `未找到字体: ${config.font}`
+      if (!selectedFont) {
+        return '没有可用的字体'
       }
 
-      ctx.logger.info('选中的字体:', config.font)
+      // config.font 是字体名称，需要通过 fonts 服务获取 Data URL
+      const fontDataUrl = ctx.fonts.getFontDataUrl(selectedFont)
+
+      if (!fontDataUrl) {
+        return `未找到字体: ${selectedFont}`
+      }
+
+      ctx.logger.info('选中的字体:', selectedFont)
       ctx.logger.info('字体 Data URL 长度:', fontDataUrl.length)
 
       // 现在可以在 HTML/CSS 中使用这个 Data URL
@@ -58,6 +65,6 @@ export function apply(ctx: Context, config: Config) {
       // 或者在 Canvas 中使用
       // 或者传递给图片生成库等
 
-      return `字体已加载: ${config.font}，文本: ${config.text}`
+      return `字体已加载: ${selectedFont}，文本: ${config.text}`
     })
 }
