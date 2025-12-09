@@ -1,6 +1,6 @@
 import { Context, Schema, Service } from 'koishi';
 import { readdirSync, readFileSync, statSync, existsSync } from 'node:fs';
-import { readdir, readFile, stat, writeFile, mkdir, access } from 'node:fs/promises';
+import { readdir, readFile, stat, writeFile, mkdir, access, writeFile as writeFileSync } from 'node:fs/promises';
 import { resolve, extname, basename, dirname } from 'node:path';
 
 export const name = 'glyph';
@@ -15,6 +15,12 @@ export const inject = {
 const readme = readFileSync(resolve(__dirname, '../readme.md'), 'utf-8');
 
 export const usage = `
+---
+
+开启插件后，需要把字体文件放到 ./data/fonts 目录
+
+重启koishi后，才能加载。
+
 ---
 
 <details>
@@ -57,7 +63,10 @@ function loadFontList(): { options: Schema<string, string>[]; description: strin
     const fontRoot = resolve(process.cwd(), 'data/fonts');
     const files = readdirSync(fontRoot);
 
-    const fontOptions: Schema<string, string>[] = [];
+    // 添加默认字体选项（始终在第一位）
+    const fontOptions: Schema<string, string>[] = [
+      Schema.const('default').description('default (不使用自定义字体)')
+    ];
     const fontItems: FontListItem[] = [];
 
     for (const file of files)
@@ -81,6 +90,13 @@ function loadFontList(): { options: Schema<string, string>[]; description: strin
 
       // 获取字体名称（不含扩展名）
       const fontName = basename(file, ext);
+
+      // 跳过 default 字体（已在前面添加）
+      if (fontName === 'default')
+      {
+        continue;
+      }
+
       const format = ext.slice(1);
       const sizeKB = (fileStats.size / 1024).toFixed(2);
 
@@ -92,14 +108,12 @@ function loadFontList(): { options: Schema<string, string>[]; description: strin
     }
 
     // 生成字体列表描述
-    let description = '';
+    let description = '<br><br>**当前可用字体列表：**<br>- default (不使用自定义字体)<br>';
     if (fontItems.length === 0)
     {
-      description = '<br><br>**当前无可用字体**<br>请将字体文件放入 data/fonts 目录';
-      fontOptions.push(Schema.const('').description('无可用字体（请将字体文件放入 data/fonts 目录）'));
+      description += '<br>**暂无其他字体**<br>请将字体文件放入 data/fonts 目录';
     } else
     {
-      description = '<br><br>**当前可用字体列表：**<br>';
       for (const item of fontItems)
       {
         description += `- ${item.name}<br>`;
@@ -111,8 +125,8 @@ function loadFontList(): { options: Schema<string, string>[]; description: strin
   {
     // 如果读取失败（例如目录不存在），返回默认选项
     return {
-      options: [Schema.const('').description('无可用字体（请将字体文件放入 data/fonts 目录）')],
-      description: '<br><br>**当前无可用字体**<br>请将字体文件放入 data/fonts 目录'
+      options: [Schema.const('default').description('default (不使用自定义字体)')],
+      description: '<br><br>**当前可用字体列表：**<br>- default (不使用自定义字体)<br><br>**暂无其他字体**<br>请将字体文件放入 data/fonts 目录'
     };
   }
 }
@@ -156,6 +170,35 @@ export class FontsService extends Service
 
   async start()
   {
+    // 确保字体目录存在
+    try
+    {
+      await mkdir(this.fontRoot, { recursive: true });
+      this.ctx.logger.debug(`字体目录已就绪: ${this.fontRoot}`);
+    } catch (err)
+    {
+      this.ctx.logger.warn(`创建字体目录失败: ${this.fontRoot}`, err);
+    }
+
+    // 创建默认字体文件（空文件）
+    const defaultFontPath = resolve(this.fontRoot, 'default.ttf');
+    try
+    {
+      await access(defaultFontPath);
+      // 文件已存在，不需要创建
+    } catch
+    {
+      // 文件不存在，创建空文件
+      try
+      {
+        await writeFile(defaultFontPath, Buffer.alloc(0));
+        this.ctx.logger.debug(`已创建默认字体文件: default.ttf`);
+      } catch (err)
+      {
+        this.ctx.logger.warn(`创建默认字体文件失败`, err);
+      }
+    }
+
     // 加载字体文件
     await this.loadFonts();
 
@@ -190,16 +233,24 @@ export class FontsService extends Service
 
         try
         {
+          // 获取字体名称（不含扩展名）
+          const fontName = basename(file, ext);
+
           // 读取字体文件
           const buffer = await readFile(filePath);
 
-          // 转换为 Base64 Data URL
-          const base64 = buffer.toString('base64');
-          const mimeType = this.getMimeType(ext);
-          const dataUrl = `data:${mimeType};base64,${base64}`;
-
-          // 获取字体名称（不含扩展名）
-          const fontName = basename(file, ext);
+          // 如果是 default 字体且文件为空，使用空字符串作为 dataUrl
+          let dataUrl: string;
+          if (fontName === 'default' && buffer.length === 0)
+          {
+            dataUrl = '';
+          } else
+          {
+            // 转换为 Base64 Data URL
+            const base64 = buffer.toString('base64');
+            const mimeType = this.getMimeType(ext);
+            dataUrl = `data:${mimeType};base64,${base64}`;
+          }
 
           // 存储字体信息
           const fontInfo: FontInfo = {
@@ -219,7 +270,7 @@ export class FontsService extends Service
       }
     } catch (err)
     {
-      this.ctx.logger.error(`读取字体目录失败: ${this.fontRoot}`, err);
+      this.ctx.logger.warn(`读取字体目录失败: ${this.fontRoot}，将仅使用默认字体`, err);
     }
   }
 
