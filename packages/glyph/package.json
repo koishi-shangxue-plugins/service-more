@@ -1,6 +1,6 @@
 {
-  "name": "koishi-plugin-fonts",
-  "description": "Font Manager for Koishi",
+  "name": "koishi-plugin-glyph",
+  "description": "Glyph Manager for Koishi",
   "version": "1.0.0",
   "main": "lib/index.js",
   "typings": "lib/index.d.ts",
@@ -21,17 +21,18 @@
     "koishi",
     "plugin",
     "font",
+    "glyph",
     "schema",
     "dynamic"
   ],
   "koishi": {
     "description": {
-      "en": "Font Manager for Koishi - Provides dynamic font schema",
-      "zh": "Koishi 的字体管理器 - 提供动态字体配置项"
+      "en": "glyph Manager for Koishi",
+      "zh": "Koishi 的字体管理器"
     },
     "service": {
       "implements": [
-        "fonts"
+        "glyph"
       ]
     }
   },

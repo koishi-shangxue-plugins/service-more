@@ -1,5 +1,5 @@
 /**
- * 这是一个示例文件，展示其他插件如何使用 koishi-plugin-fonts
+ * 这是一个示例文件，展示其他插件如何使用 koishi-plugin-glyph
  *
  * 使用方法：
  * 1. 在你的插件中安装 koishi-plugin-fonts
@@ -9,14 +9,14 @@
  */
 
 import { Context, Schema } from 'koishi';
-import { fontlist } from 'koishi-plugin-fonts';
-import { } from 'koishi-plugin-fonts';  // 导入类型声明
+import { fontlist } from 'koishi-plugin-glyph';
+import { } from 'koishi-plugin-glyph';  // 导入类型声明
 
 export const name = 'example-plugin';
 
 // 必须注入 fonts 服务才能获取字体 Data URL
 export const inject = {
-  required: ['fonts']
+  required: ['glyph']
 };
 
 export interface Config
@@ -40,7 +40,7 @@ export function apply(ctx: Context, config: Config)
     .action(async ({ session }) =>
     {
       // 如果没有选择字体，使用第一个可用字体
-      const selectedFont = config.font || ctx.fonts.getFontNames()[0];
+      const selectedFont = config.font || ctx.glyph.getFontNames()[0];
 
       if (!selectedFont)
       {

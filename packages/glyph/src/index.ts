@@ -125,7 +125,7 @@ export class FontsService extends Service
 
   constructor(ctx: Context, public config: FontsService.Config)
   {
-    super(ctx, 'fonts', true);
+    super(ctx, 'glyph', true);
     this.fontRoot = resolve(ctx.baseDir, config.root);
   }
 
