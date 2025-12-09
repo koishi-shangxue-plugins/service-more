@@ -6,9 +6,7 @@
   "typings": "lib/index.d.ts",
   "files": [
     "lib",
-    "dist",
-    "src",
-    "client"
+    "src"
   ],
   "keywords": [
     "bot",
@@ -16,23 +14,17 @@
     "koishi",
     "plugin",
     "font",
-    "storage",
-    "text"
+    "schema",
+    "dynamic"
   ],
   "koishi": {
     "description": {
-      "en": "Font Manager for Koishi",
-      "zh": "Koishi 的字体管理器"
+      "en": "Font Manager for Koishi - Provides dynamic font schema",
+      "zh": "Koishi 的字体管理器 - 提供动态字体配置项"
     },
-    "implements": [
-      "fonts"
-    ],
-    "services": {
-      "required": [
-        "database"
-      ],
-      "optional": [
-        "console"
+    "service": {
+      "implements": [
+        "fonts"
       ]
     }
   },
@@ -40,12 +32,6 @@
     "koishi": "^4.18.7"
   },
   "devDependencies": {
-    "@koishijs/client": "^5.30.7",
-    "@koishijs/plugin-console": "^5.30.7",
     "koishi": "^4.18.7"
-  },
-  "dependencies": {
-    "@koishijs/console": "^5.30.7",
-    "sanitize-filename": "^1.6.3"
   }
 }

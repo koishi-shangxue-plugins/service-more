@@ -1,59 +1,170 @@
-import { resolve } from 'path'
-
-import { Context } from 'koishi'
-
-import { Config } from './config'
-import { Fonts, Provider } from './font'
-
-import type {} from '@koishijs/console'
-
-export { Fonts, Provider, Config }
+import { Context, Schema, Service } from 'koishi'
+import { readdir, readFile, stat } from 'node:fs/promises'
+import { resolve, extname, basename } from 'node:path'
 
 export const name = 'fonts'
 
 export const inject = {
-  required: ['database'],
-  optional: ['console'],
+  required: [],
+  optional: []
 }
 
+// 支持的字体格式
+const SUPPORTED_FORMATS = ['.ttf', '.otf', '.woff', '.woff2'] as const
+
+// 字体信息接口
+interface FontInfo {
+  name: string        // 字体文件名（不含扩展名）
+  dataUrl: string     // Base64 Data URL
+  format: string      // 字体格式
+  size: number        // 文件大小（字节）
+}
+
+// 声明 fonts 服务
 declare module 'koishi' {
   interface Context {
-    fonts: Fonts
-  }
-
-  interface Tables {
-    fonts: Fonts.Font
-  }
-
-  interface Events {
-    // TODO: Add event invocation methods
-    // 'fonts/register'(name: string, paths: string[]): void
-    // 'fonts/delete'(name: string, fonts: Fonts.Font[]): void
+    fonts: FontsService
   }
 }
 
-declare module '@koishijs/console' {
-  namespace Console {
-    interface Services {
-      fonts: Provider
+// Fonts 服务类
+export class FontsService extends Service {
+  private fontMap: Map<string, FontInfo> = new Map()
+  private fontRoot: string
+
+  constructor(ctx: Context, public config: FontsService.Config) {
+    super(ctx, 'fonts', true)
+    this.fontRoot = resolve(ctx.baseDir, config.root)
+  }
+
+  async start() {
+    // 加载字体文件
+    await this.loadFonts()
+
+    // 注册动态配置项
+    this.registerDynamicSchema()
+
+    this.ctx.logger.info(`已加载 ${this.fontMap.size} 个字体文件`)
+  }
+
+  // 加载字体目录中的所有字体文件
+  private async loadFonts() {
+    try {
+      const files = await readdir(this.fontRoot)
+
+      for (const file of files) {
+        const ext = extname(file).toLowerCase()
+
+        // 只处理支持的字体格式
+        if (!SUPPORTED_FORMATS.includes(ext as any)) {
+          continue
+        }
+
+        const filePath = resolve(this.fontRoot, file)
+        const fileStats = await stat(filePath)
+
+        // 跳过目录
+        if (fileStats.isDirectory()) {
+          continue
+        }
+
+        try {
+          // 读取字体文件
+          const buffer = await readFile(filePath)
+
+          // 转换为 Base64 Data URL
+          const base64 = buffer.toString('base64')
+          const mimeType = this.getMimeType(ext)
+          const dataUrl = `data:${mimeType};base64,${base64}`
+
+          // 获取字体名称（不含扩展名）
+          const fontName = basename(file, ext)
+
+          // 存储字体信息
+          const fontInfo: FontInfo = {
+            name: fontName,
+            dataUrl,
+            format: ext.slice(1), // 去掉开头的点
+            size: fileStats.size
+          }
+
+          this.fontMap.set(fontName, fontInfo)
+
+          this.ctx.logger.debug(`已加载字体: ${fontName} (${ext}, ${(fileStats.size / 1024).toFixed(2)} KB)`)
+        } catch (err) {
+          this.ctx.logger.warn(`加载字体文件失败: ${file}`, err)
+        }
+      }
+    } catch (err) {
+      this.ctx.logger.error(`读取字体目录失败: ${this.fontRoot}`, err)
     }
   }
 
-  interface Events {
-    'fonts/delete'(name: string, fonts: Fonts.Font[]): void
-    'fonts/download'(name: string, url: string[]): void
-    'fonts/cancel'(name: string, url: string[]): void
+  // 获取字体的 MIME 类型
+  private getMimeType(ext: string): string {
+    const mimeTypes: Record<string, string> = {
+      '.ttf': 'font/ttf',
+      '.otf': 'font/otf',
+      '.woff': 'font/woff',
+      '.woff2': 'font/woff2'
+    }
+    return mimeTypes[ext.toLowerCase()] || 'application/octet-stream'
+  }
+
+  // 注册动态配置项
+  private registerDynamicSchema() {
+    // 创建字体选项列表
+    const fontOptions = Array.from(this.fontMap.entries()).map(([name, info]) => {
+      return Schema.const(info.dataUrl).description(`${name} (${info.format}, ${(info.size / 1024).toFixed(2)} KB)`)
+    })
+
+    // 如果没有字体，添加一个默认选项
+    if (fontOptions.length === 0) {
+      fontOptions.push(Schema.const('').description('无可用字体'))
+    }
+
+    // 注册动态配置项 'font'
+    this.ctx.schema.extend('font', Schema.union(fontOptions))
+
+    this.ctx.logger.debug(`已注册 ${fontOptions.length} 个字体到动态配置项`)
+  }
+
+  // 获取字体信息（可选的辅助方法）
+  getFontInfo(name: string): FontInfo | undefined {
+    return this.fontMap.get(name)
+  }
+
+  // 获取所有字体名称列表
+  getFontNames(): string[] {
+    return Array.from(this.fontMap.keys())
+  }
+
+  // 根据名称获取字体 Data URL
+  getFontDataUrl(name: string): string | undefined {
+    return this.fontMap.get(name)?.dataUrl
   }
 }
 
-export function apply(ctx: Context, config: Config) {
-  ctx.plugin(Fonts, config)
-  // ctx.console.addListener('fonts/register', this.fonts.register)
+export namespace FontsService {
+  export interface Config {
+    root: string
+  }
 
-  ctx.inject(['console'], (ctx) => {
-    ctx.console.addEntry({
-      dev: resolve(__dirname, '../client/index.ts'),
-      prod: resolve(__dirname, '../dist'),
+  export const Config: Schema<Config> = Schema.object({
+    root: Schema.path({
+      filters: ['directory'],
+      allowCreate: true,
     })
+      .default('data/fonts')
+      .description('存放字体文件的目录路径')
   })
+}
+
+// 导出配置
+export const Config = FontsService.Config
+
+// 应用插件
+export function apply(ctx: Context, config: FontsService.Config) {
+  // 注册 fonts 服务
+  ctx.plugin(FontsService, config)
 }
