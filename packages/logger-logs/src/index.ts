@@ -1,6 +1,7 @@
 import { Context, Dict, Logger, remove, Schema, Time } from 'koishi';
 import { DataService } from '@koishijs/plugin-console';
 import { resolve } from 'path';
+import { fileURLToPath } from 'node:url';
 import { mkdir, readdir, rm } from 'fs/promises';
 import { FileWriter } from './file';
 declare module '@koishijs/plugin-console' {
@@ -38,8 +39,8 @@ class LogProvider extends DataService<Logger.Record[]>
       // @ts-ignore
       import.meta.url.replace(/\/src\/[^/]+$/, '/client/index.ts'),
     ] : {
-      dev: resolve(__dirname, '../client/index.ts'),
-      prod: resolve(__dirname, '../dist'),
+      dev: resolve(fileURLToPath(new URL('.', import.meta.url)), '../client/index.ts'),
+      prod: resolve(fileURLToPath(new URL('.', import.meta.url)), '../dist'),
     });
   }
 

@@ -15,4 +15,7 @@
       "@koishijs/client/global",
     ],
   },
+  "vueCompilerOptions": {
+    "target": 3.3
+  },
 }

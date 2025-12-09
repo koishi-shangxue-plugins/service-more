@@ -2,8 +2,12 @@
   "name": "koishi-plugin-logger-logs",
   "description": "Dump log files for Koishi",
   "version": "0.1.0",
+  "type": "module",
   "main": "lib/index.js",
   "typings": "lib/index.d.ts",
+  "exports": {
+    ".": "./lib/index.js"
+  },
   "files": [
     "lib",
     "dist",
