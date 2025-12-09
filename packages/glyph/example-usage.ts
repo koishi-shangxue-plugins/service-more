@@ -36,6 +36,7 @@ export const Config: Schema<Config> = Schema.object({
 
 export function apply(ctx: Context, config: Config)
 {
+
   ctx.command('test-font')
     .action(async ({ session }) =>
     {
