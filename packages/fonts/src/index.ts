@@ -1,6 +1,7 @@
 import { Context, Schema, Service } from 'koishi'
 import { readdir, readFile, stat } from 'node:fs/promises'
 import { resolve, extname, basename } from 'node:path'
+import { ref, watch } from '@vue/reactivity'
 
 export const name = 'fonts'
 
@@ -31,6 +32,8 @@ declare module 'koishi' {
 export class FontsService extends Service {
   private fontMap: Map<string, FontInfo> = new Map()
   private fontRoot: string
+  // 使用响应式引用存储字体选项
+  private fontOptionsRef = ref<Schema<string, string>[]>([])
 
   constructor(ctx: Context, public config: FontsService.Config) {
     super(ctx, 'fonts', true)
@@ -41,7 +44,7 @@ export class FontsService extends Service {
     // 加载字体文件
     await this.loadFonts()
 
-    // 注册动态配置项
+    // 注册动态配置项（使用响应式系统）
     this.registerDynamicSchema()
 
     this.ctx.logger.info(`已加载 ${this.fontMap.size} 个字体文件`)
@@ -111,11 +114,11 @@ export class FontsService extends Service {
     return mimeTypes[ext.toLowerCase()] || 'application/octet-stream'
   }
 
-  // 注册动态配置项
+  // 注册动态配置项（使用响应式系统）
   private registerDynamicSchema() {
-    // 创建字体选项列表
+    // 创建字体选项列表 - 值是字体名称，描述包含格式和大小信息
     const fontOptions = Array.from(this.fontMap.entries()).map(([name, info]) => {
-      return Schema.const(info.dataUrl).description(`${name} (${info.format}, ${(info.size / 1024).toFixed(2)} KB)`)
+      return Schema.const(name).description(`${name} (${info.format}, ${(info.size / 1024).toFixed(2)} KB)`)
     })
 
     // 如果没有字体，添加一个默认选项
@@ -123,9 +126,23 @@ export class FontsService extends Service {
       fontOptions.push(Schema.const('').description('无可用字体'))
     }
 
-    // 使用 ctx.schema.set() 注册动态类型
-    // 其他插件可以通过 Schema.dynamic('font') 来引用
-    this.ctx.schema.set('font', Schema.union(fontOptions))
+    // 更新响应式引用
+    this.fontOptionsRef.value = fontOptions
+
+    // 使用 watch 监听字体选项变化，并更新 schema
+    const watcher = watch(
+      this.fontOptionsRef,
+      (options) => {
+        this.ctx.schema.set('font', Schema.union(options))
+        this.ctx.logger.info(`已更新动态配置项 'font'，共 ${options.length} 个选项`)
+      },
+      {
+        immediate: true  // 立即执行一次
+      }
+    )
+
+    // 在插件卸载时停止 watcher
+    this.ctx.effect(() => () => watcher.stop())
 
     this.ctx.logger.info(`已注册 ${this.fontMap.size} 个字体选项到动态配置项 'font'`)
     this.ctx.logger.info('字体列表:', Array.from(this.fontMap.keys()).join(', '))
@@ -150,6 +167,7 @@ export class FontsService extends Service {
 export namespace FontsService {
   export interface Config {
     root: string
+    testFont: string  // 测试配置项
   }
 
   export const Config: Schema<Config> = Schema.object({
@@ -158,7 +176,10 @@ export namespace FontsService {
       allowCreate: true,
     })
       .default('data/fonts')
-      .description('存放字体文件的目录路径')
+      .description('存放字体文件的目录路径'),
+
+    testFont: Schema.dynamic('font')
+      .description('测试：选择字体（用于验证动态配置项是否工作）')
   })
 }
 
@@ -169,4 +190,9 @@ export const Config = FontsService.Config
 export function apply(ctx: Context, config: FontsService.Config) {
   // 注册 fonts 服务
   ctx.plugin(FontsService, config)
+
+  // 测试：打印选中的字体
+  if (config.testFont) {
+    ctx.logger.info('测试配置项 testFont 的值:', config.testFont)
+  }
 }

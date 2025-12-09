@@ -1,30 +1,32 @@
 /**
  * 这是一个示例文件，展示其他插件如何使用 koishi-plugin-fonts
- * 
+ *
  * 使用方法：
  * 1. 在你的插件中安装 koishi-plugin-fonts
- * 2. 在配置 Schema 中使用 Schema.dynamic('font')
- * 3. 通过 config.font 直接获取字体的 Base64 Data URL
+ * 2. 必须注入 fonts 服务
+ * 3. 在配置 Schema 中使用 Schema.dynamic('font')
+ * 4. 通过 ctx.fonts.getFontDataUrl(config.font) 获取字体的 Base64 Data URL
  */
 
 import { Context, Schema } from 'koishi'
+import { } from 'koishi-plugin-fonts'
 
 export const name = 'example-plugin'
 
-// 不需要 inject fonts 服务，因为我们只使用动态配置项
+// 必须注入 fonts 服务才能获取字体 Data URL
 export const inject = {
-  required: [],
-  optional: []
+  required: ['fonts']
 }
 
 export interface Config {
-  font: string  // 这里会是字体的 Base64 Data URL
+  font: string  // 这里存储的是字体名称（例如："NotoColorEmoji-Regular"）
   text: string
 }
 
 export const Config: Schema<Config> = Schema.object({
   // 使用 Schema.dynamic('font') 来获取字体列表
   // 用户在 UI 上会看到一个下拉框，包含所有可用的字体
+  // 配置项的值是字体名称，不是 Data URL
   font: Schema.dynamic('font').description('选择要使用的字体'),
 
   text: Schema.string().default('Hello World').description('要渲染的文本')
@@ -33,23 +35,28 @@ export const Config: Schema<Config> = Schema.object({
 export function apply(ctx: Context, config: Config) {
   ctx.command('test-font')
     .action(async ({ session }) => {
-      // config.font 直接就是字体的 Base64 Data URL
-      // 格式类似: data:font/ttf;base64,AAEAAAALAIAAAwAwT1M...
+      // config.font 是字体名称，需要通过 fonts 服务获取 Data URL
+      const fontDataUrl = ctx.fonts.getFontDataUrl(config.font)
 
-      ctx.logger.info('字体 Data URL:', config.font.substring(0, 50) + '...')
+      if (!fontDataUrl) {
+        return `未找到字体: ${config.font}`
+      }
 
-      // 你可以直接在 HTML/CSS 中使用这个 Data URL
+      ctx.logger.info('选中的字体:', config.font)
+      ctx.logger.info('字体 Data URL 长度:', fontDataUrl.length)
+
+      // 现在可以在 HTML/CSS 中使用这个 Data URL
       // 例如在生成图片时：
       const fontFace = `
         @font-face {
           font-family: 'CustomFont';
-          src: url('${config.font}');
+          src: url('${fontDataUrl}');
         }
       `
 
       // 或者在 Canvas 中使用
       // 或者传递给图片生成库等
 
-      return `字体已加载，文本: ${config.text}`
+      return `字体已加载: ${config.font}，文本: ${config.text}`
     })
 }
