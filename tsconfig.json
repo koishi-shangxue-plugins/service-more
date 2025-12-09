@@ -1,0 +1,11 @@
+{
+  "extends": "./tsconfig.base",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "koishi-plugin-database-*": [ "packages/database-*/src" ],
+      "koishi-plugin-cache-*": [ "packages/cache-*/src" ],
+      "koishi-plugin-glyph": [ "packages/glyph/src" ],
+    },
+  },
+}

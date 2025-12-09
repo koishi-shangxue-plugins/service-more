@@ -8,10 +8,6 @@
   ],
   "license": "MIT",
   "scripts": {
-    "build": "yakumo build",
-    "bump": "yakumo version",
-    "dep": "yakumo upgrade",
-    "pub": "yakumo publish",
     "postinstall": "node scripts/patch-tsconfig.js"
   }
 }

@@ -10,8 +10,8 @@
  */
 
 import { Context, Schema } from 'koishi';
-import { fontlist } from './src/index';
-import type { } from './src/index';  // 导入类型声明
+import { fontlist } from 'koishi-plugin-glyph';
+import type { } from 'koishi-plugin-glyph';
 
 export const name = 'example-plugin';
 
@@ -43,7 +43,7 @@ export function apply(ctx: Context, config: Config)
     // 示例：检查并下载 Noto Color Emoji 字体
     const fontExists = await ctx.glyph.checkFont(
       'NotoColorEmoji-Regular',
-      'https://github.com/googlefonts/noto-emoji/raw/main/fonts/NotoColorEmoji.ttf'
+      'https://cdn.jsdelivr.net/gh/googlefonts/noto-emoji@main/fonts/NotoColorEmoji.ttf'
     );
 
     if (fontExists)
