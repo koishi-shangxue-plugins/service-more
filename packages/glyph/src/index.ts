@@ -3,7 +3,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { readdir, readFile, stat } from 'node:fs/promises';
 import { resolve, extname, basename } from 'node:path';
 
-export const name = 'fonts';
+export const name = 'glyph';
 export const reusable = false;
 export const filter = false;
 
