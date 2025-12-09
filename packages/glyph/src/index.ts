@@ -12,7 +12,7 @@ export const inject = {
   optional: [],
 };
 
-const readme = readFileSync(resolve(__dirname, '../readme.md'), 'utf-8');
+const readme = readFileSync(resolve(__dirname, './../README.md'), 'utf-8');
 
 export const usage = `
 ---
