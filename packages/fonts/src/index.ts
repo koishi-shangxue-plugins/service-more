@@ -10,11 +10,11 @@ export const inject = {
   optional: [],
 };
 
-// 支持的字体格式
-const SUPPORTED_FORMATS = ['.ttf', '.otf', '.woff', '.woff2'] as const;
+// 默认支持的字体格式
+const DEFAULT_SUPPORTED_FORMATS = ['.ttf', '.otf', '.woff', '.woff2', '.ttc'] as const;
 
 // 读取字体列表
-function loadFontSchemaOptions(): Schema<string, string>[]
+function loadFontSchemaOptions(supportedFormats: readonly string[] = DEFAULT_SUPPORTED_FORMATS): Schema<string, string>[]
 {
   try
   {
@@ -28,7 +28,7 @@ function loadFontSchemaOptions(): Schema<string, string>[]
       const ext = extname(file).toLowerCase();
 
       // 只处理支持的字体格式
-      if (!SUPPORTED_FORMATS.includes(ext as any))
+      if (!supportedFormats.includes(ext))
       {
         continue;
       }
@@ -121,7 +121,7 @@ export class FontsService extends Service
         const ext = extname(file).toLowerCase();
 
         // 只处理支持的字体格式
-        if (!SUPPORTED_FORMATS.includes(ext as any))
+        if (!this.config.supportedFormats.includes(ext))
         {
           continue;
         }
@@ -177,7 +177,8 @@ export class FontsService extends Service
       '.ttf': 'font/ttf',
       '.otf': 'font/otf',
       '.woff': 'font/woff',
-      '.woff2': 'font/woff2'
+      '.woff2': 'font/woff2',
+      '.ttc': 'font/collection'
     };
     return mimeTypes[ext.toLowerCase()] || 'application/octet-stream';
   }
@@ -206,6 +207,8 @@ export namespace FontsService
   export interface Config
   {
     root: string;
+    supportedFormats: string[];
+    fontPreview: string;
   }
 
   export const Config: Schema<Config> = Schema.object({
@@ -214,7 +217,14 @@ export namespace FontsService
       allowCreate: true,
     })
       .default('data/fonts')
-      .description('存放字体文件的目录路径')
+      .description('存放字体文件的目录路径'),
+
+    supportedFormats: Schema.array(String).role('table')
+      .default(['.ttf', '.otf', '.woff', '.woff2', '.ttc'])
+      .description('支持的字体格式（包括点号，例如：`.ttf`）'),
+
+    fontPreview: Schema.union(fontSchemaOptions).role('radio')
+      .description('字体列表展示（用于预览所有可用字体，无实际功能）')
   });
 }
 
