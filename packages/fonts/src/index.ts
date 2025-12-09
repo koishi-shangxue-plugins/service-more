@@ -7,7 +7,7 @@ export const name = 'fonts';
 
 export const inject = {
   required: [],
-  optional: []
+  optional: [],
 };
 
 // 支持的字体格式
@@ -158,7 +158,7 @@ export class FontsService extends Service
 
           this.fontMap.set(fontName, fontInfo);
 
-          this.ctx.logger.info(`已加载字体: ${fontName} (${ext}, ${(fileStats.size / 1024).toFixed(2)} KB)`);
+          this.ctx.logger.debug(`已加载字体: ${fontName} (${ext}, ${(fileStats.size / 1024).toFixed(2)} KB)`);
         } catch (err)
         {
           this.ctx.logger.warn(`加载字体文件失败: ${file}`, err);
