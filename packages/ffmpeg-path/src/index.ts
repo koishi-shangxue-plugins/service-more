@@ -1,5 +1,5 @@
 import { Context, Schema } from 'koishi';
-import { } from 'koishi-plugin-downloads';
+import type { } from 'koishi-plugin-downloads';
 import { access, constants, readdir, stat } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { resolve, delimiter } from 'node:path';
@@ -12,14 +12,15 @@ const platform = os.platform();
 const arch = os.arch();
 
 export const name = 'ffmpeg-path';
-
+export const reusable = false;
+export const filter = false;
 export const inject = {
   optional: ['downloads']
 };
 
 export const usage = `
-
-### Termux 环境配置 (重要)
+<details>
+<summary>Termux 相关 -- 环境配置</summary>
 
 由于 Termux 的特殊文件系统结构，您需要手动指定 FFmpeg 的路径。请按照以下步骤操作：
 
@@ -43,23 +44,27 @@ export const usage = `
 
 4.  **重载插件:** 保存配置文件并重载插件，以使配置生效。
 
+</details>
+
 ### 其他平台
 
-对于其他平台（Windows、macOS、Linux），支持自动下载。
+对于其他平台（Windows、macOS、Linux），支持自动检测环境变量和自动下载（通过downloads插件）。
 
-如果您希望使用特定版本的 FFmpeg，您仍然可以通过 \`path\` 选项指定其绝对路径。
+如果您希望使用特定版本的 FFmpeg，您仍然可以通过 \`path\` 选项 手动指定其绝对路径。
 
-### 自动下载
+### 自动检测 & 自动下载
 
-如果您没有安装 FFmpeg，或者不想手动配置路径，插件会自动下载 FFmpeg。但是，请注意：
+如果您已经安装了 FFmpeg，并且配置好了环境变量，本插件会自动识别 可执行文件的路径 并使用。
+
+如果您没有安装 FFmpeg，或者不想手动配置路径，插件会自动下载 FFmpeg。
+
+但是，请注意：
 
 *   自动下载的 FFmpeg 可能不是最新版本。
 *   在某些环境中，自动下载可能会失败。
 *   自动下载的ffmpeg将会存放在项目目录下的\`download\`文件夹中
 
 ---
-
-个人使用咪~ 会在 [原项目的PR11](https://github.com/koishijs/koishi-plugin-ffmpeg/pull/11) 通过时 移除本插件。
 `;
 
 export interface Config
