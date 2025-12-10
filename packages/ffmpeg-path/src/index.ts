@@ -2,7 +2,7 @@ import { Context, Schema } from 'koishi';
 import { } from 'koishi-plugin-downloads';
 import { access, constants, readdir, stat } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { resolve, delimiter } from 'node:path';
 import * as os from 'node:os';
 import { FFmpeg } from './ffmpeg';
 export * from './ffmpeg';
@@ -66,6 +66,7 @@ export interface Config
 {
   loggerinfo: boolean;
   path?: string;
+  autoDetect: boolean;
   downloadsFFmpeg: boolean;
   pathFormDownloads: boolean;
   waitForDownloads: boolean;
@@ -74,11 +75,19 @@ export interface Config
 
 export const Config: Schema<Config> = Schema.intersect([
   Schema.object({
-    path: Schema.string().description('指定`ffmpeg可执行文件`的绝对路径'),
+    autoDetect: Schema.boolean().default(true).description('自动检测环境变量中的 FFmpeg。'),
     downloadsFFmpeg: Schema.boolean().default(true).description("找不到可执行文件时，自动调用`downloads`下载`ffmpeg.exe`"),
-  }).description('基础设置'),
+  }).description('FFmpeg设置'),
+  Schema.union([
+    Schema.object({ autoDetect: Schema.const(true) }),
+    Schema.object({
+      autoDetect: Schema.const(false).required(),
+      path: Schema.string().description('手动指定`ffmpeg可执行文件`的绝对路径'),
+    }),
+  ]),
+
   Schema.object({
-    pathFormDownloads: Schema.boolean().default(true).description("指定路径不可用时，检测`./downloads`目录下是否存在可执行文件"),
+    pathFormDownloads: Schema.boolean().default(true).description("指定路径不可用时，检测 koishi 目录的`./downloads`目录下是否存在可执行文件"),
     waitForDownloads: Schema.boolean().default(true).description("文件不可用 且 `downloads`服务不可用时，监测`downloads`服务状态"),
   }).description('进阶设置'),
   Schema.union([
@@ -106,20 +115,59 @@ export async function apply(ctx: Context, config: Config)
     monitorAvailability();
   });
 
+  // 在环境变量中查找 ffmpeg，不依赖外部命令
+  async function findExecutableInPath(): Promise<string | null>
+  {
+    // 根据配置决定是否执行
+    if (!config.autoDetect) return null;
+
+    const pathVar = process.env.PATH || '';
+    const pathDirs = pathVar.split(delimiter);
+
+    // 在 Windows 上要检查的潜在可执行文件名
+    const executableNames = platform === 'win32' ? ['ffmpeg.exe', 'ffmpeg'] : ['ffmpeg'];
+
+    for (const dir of pathDirs)
+    {
+      for (const name of executableNames)
+      {
+        const fullPath = resolve(dir, name);
+        if (await checkPath(fullPath))
+        {
+          logInfo(`在环境变量中找到 ffmpeg: ${fullPath}`);
+          return fullPath;
+        }
+      }
+    }
+
+    logInfo(`在环境变量 PATH 中未找到有效的 ffmpeg 可执行文件。`);
+    return null;
+  }
+
   // 持续监听 downloads 服务或指定的 path
   async function monitorAvailability()
   {
     logInfo(config);
     while (!executable)
     {
-      // 检查指定的 path
+      // 1. 检查用户指定的 path
       if (config.path && await checkPath(config.path))
       {
         executable = config.path;
+        ctx.logger.info(`使用用户指定的 FFmpeg 路径: ${executable}`);
         break; // 退出循环
       }
 
-      // 优先尝试查找 downloads 目录下的 ffmpeg
+      // 2. 在环境变量中查找 ffmpeg
+      const systemPathExecutable = await findExecutableInPath();
+      if (systemPathExecutable)
+      {
+        executable = systemPathExecutable;
+        ctx.logger.info(`在环境变量中找到 FFmpeg: ${executable}`);
+        break; // 退出循环
+      }
+
+      // 3. 尝试查找 downloads 目录下的 ffmpeg
       const downloadsDirExecutable = await tryFindDownloadsDir();
       if (downloadsDirExecutable)
       {
@@ -128,7 +176,7 @@ export async function apply(ctx: Context, config: Config)
         break; // 退出循环
       }
 
-      // 尝试使用 downloads 服务
+      // 4. 尝试使用 downloads 服务下载
       const downloadsExecutable = await tryUseDownloads();
       if (downloadsExecutable)
       {
@@ -285,3 +333,4 @@ function bucket()
   }
   return bucket;
 }
+
