@@ -15,7 +15,9 @@ export const name = 'ffmpeg-path';
 export const reusable = false;
 export const filter = false;
 export const inject = {
-  optional: ['downloads']
+  "required": ["logger"],
+  "optional": ["downloads"],
+  "implements": ["ffmpeg"]
 };
 
 export const usage = `
