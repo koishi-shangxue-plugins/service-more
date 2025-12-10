@@ -1,17 +1,17 @@
-import { Context, Schema } from 'koishi'
-import { } from 'koishi-plugin-downloads'
-import { access, constants, readdir, stat } from 'node:fs/promises'
-import { existsSync } from 'node:fs'
-import { resolve } from 'node:path'
-import * as os from 'node:os'
-import { FFmpeg } from './ffmpeg'
-export * from './ffmpeg'
-import registry from 'get-registry'
+import { Context, Schema } from 'koishi';
+import { } from 'koishi-plugin-downloads';
+import { access, constants, readdir, stat } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
+import { resolve } from 'node:path';
+import * as os from 'node:os';
+import { FFmpeg } from './ffmpeg';
+export * from './ffmpeg';
+import registry from 'get-registry';
 
-const platform = os.platform()
-const arch = os.arch()
+const platform = os.platform();
+const arch = os.arch();
 
-export const name = 'ffmpeg-path'
+export const name = 'ffmpeg-path';
 
 export const inject = {
   optional: ['downloads']
@@ -62,13 +62,14 @@ export const usage = `
 个人使用咪~ 会在 [原项目的PR11](https://github.com/koishijs/koishi-plugin-ffmpeg/pull/11) 通过时 移除本插件。
 `;
 
-export interface Config {
-  loggerinfo: boolean
-  path?: string
-  downloadsFFmpeg: boolean
-  pathFormDownloads: boolean
-  waitForDownloads: boolean
-  resolveTime?: number
+export interface Config
+{
+  loggerinfo: boolean;
+  path?: string;
+  downloadsFFmpeg: boolean;
+  pathFormDownloads: boolean;
+  waitForDownloads: boolean;
+  resolveTime?: number;
 }
 
 export const Config: Schema<Config> = Schema.intersect([
@@ -93,29 +94,35 @@ export const Config: Schema<Config> = Schema.intersect([
   Schema.object({
     loggerinfo: Schema.boolean().default(false).description("日志调试模式"),
   }).description('开发者选项'),
-])
-export async function apply(ctx: Context, config: Config) {
+]);
+export async function apply(ctx: Context, config: Config)
+{
   let executable: string | null = null; // 初始值为 null，表示尚未找到可执行文件
   let downloadsServiceRequired = false; // 标记是否需要 downloads 服务
 
   // 视奸
-  ctx.on('ready', () => {
+  ctx.on('ready', () =>
+  {
     monitorAvailability();
   });
 
   // 持续监听 downloads 服务或指定的 path
-  async function monitorAvailability() {
-    logInfo(config)
-    while (!executable) {
+  async function monitorAvailability()
+  {
+    logInfo(config);
+    while (!executable)
+    {
       // 检查指定的 path
-      if (config.path && await checkPath(config.path)) {
+      if (config.path && await checkPath(config.path))
+      {
         executable = config.path;
         break; // 退出循环
       }
 
       // 优先尝试查找 downloads 目录下的 ffmpeg
       const downloadsDirExecutable = await tryFindDownloadsDir();
-      if (downloadsDirExecutable) {
+      if (downloadsDirExecutable)
+      {
         executable = downloadsDirExecutable;
         ctx.logger.warn(`检测到 指定路径不可用，使用 downloads 目录下的 FFmpeg 文件。`);
         break; // 退出循环
@@ -123,7 +130,8 @@ export async function apply(ctx: Context, config: Config) {
 
       // 尝试使用 downloads 服务
       const downloadsExecutable = await tryUseDownloads();
-      if (downloadsExecutable) {
+      if (downloadsExecutable)
+      {
         executable = downloadsExecutable;
         ctx.logger.warn(`downloads 成功下载 FFmpeg: ${executable}`);
         break; // 退出循环
@@ -136,59 +144,75 @@ export async function apply(ctx: Context, config: Config) {
     }
 
     // 如果找到了可执行文件，则启动插件
-    if (executable) {
+    if (executable)
+    {
       ctx.logger.info(`使用 FFmpeg 可执行文件: ${executable}`);
       ctx.plugin(FFmpeg, executable);
-    } else {
+    } else
+    {
       ctx.logger.error(`无法找到可用的 FFmpeg 可执行文件。插件启动失败。`);
     }
   }
 
-  function logInfo(...args: any[]) {
-    if (config.loggerinfo) {
+  function logInfo(...args: any[])
+  {
+    if (config.loggerinfo)
+    {
       (ctx.logger.info as (...args: any[]) => void)(...args);
     }
   }
 
   // 检查指定的 path 是否可用
-  async function checkPath(path: string): Promise<boolean> {
-    if (!path || !existsSync(path)) {
+  async function checkPath(path: string): Promise<boolean>
+  {
+    if (!path || !existsSync(path))
+    {
       return false;
     }
-    try {
+    try
+    {
       const stats = await stat(path);
-      if (!stats.isFile()) { // 检查是否是文件
+      if (!stats.isFile())
+      { // 检查是否是文件
         return false;
       }
       await access(path, constants.F_OK | constants.X_OK);
       return true;
-    } catch (error) {
+    } catch (error)
+    {
       return false;
     }
   }
 
   // 尝试查找 downloads 目录下的 ffmpeg
-  async function tryFindDownloadsDir(): Promise<string | null> {
+  async function tryFindDownloadsDir(): Promise<string | null>
+  {
     if (!config.pathFormDownloads) return null; // 如果配置项禁用，则直接返回 null
 
     const downloadsDir = './downloads';
-    if (!existsSync(downloadsDir)) {
+    if (!existsSync(downloadsDir))
+    {
       return null;
     }
 
-    try {
+    try
+    {
       const files = await readdir(downloadsDir);
-      for (const file of files) {
+      for (const file of files)
+      {
         const fullPath = resolve(downloadsDir, file);
         const stats = await stat(fullPath);
-        if (stats.isDirectory()) {
+        if (stats.isDirectory())
+        {
           const ffmpegPath = resolve(fullPath, platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg');
-          if (await checkPath(ffmpegPath)) {
+          if (await checkPath(ffmpegPath))
+          {
             return ffmpegPath;
           }
         }
       }
-    } catch (error) {
+    } catch (error)
+    {
       ctx.logger.warn(`查找 downloads 目录下的 FFmpeg 失败: `, error);
       return null;
     }
@@ -196,23 +220,28 @@ export async function apply(ctx: Context, config: Config) {
   }
 
   // 尝试使用 downloads 服务
-  async function tryUseDownloads(): Promise<string | null> {
+  async function tryUseDownloads(): Promise<string | null>
+  {
     if (!config.downloadsFFmpeg) return null; // 如果配置项禁用，则直接返回 null
 
-    if (!ctx.downloads) {
-      if (downloadsServiceRequired === false) {
+    if (!ctx.downloads)
+    {
+      if (downloadsServiceRequired === false)
+      {
         ctx.logger.warn(`缺少 downloads 依赖。请确保已安装并启用该插件。`);
         downloadsServiceRequired = true; // 只提示一次
       }
       return null;
     }
-    try {
+    try
+    {
       const task = ctx.downloads.nereid('ffmpeg', [
         `npm://@koishijs-assets/ffmpeg?registry=${await registry()}`
       ], bucket());
       const path = await task.promise;
       return platform === 'win32' ? `${path}/ffmpeg.exe` : `${path}/ffmpeg`;
-    } catch (error) {
+    } catch (error)
+    {
       ctx.logger.warn(`使用 downloads 服务下载 FFmpeg 失败: `, error);
       return null;
     }
@@ -220,9 +249,11 @@ export async function apply(ctx: Context, config: Config) {
 
 }
 
-function bucket() {
+function bucket()
+{
   let bucket = 'ffmpeg-';
-  switch (platform) {
+  switch (platform)
+  {
     case 'win32':
       bucket += 'windows-';
       break;
@@ -235,7 +266,8 @@ function bucket() {
     default:
       throw new Error(`不支持的平台: ${platform}`);
   }
-  switch (arch) {
+  switch (arch)
+  {
     case 'arm':
       bucket += 'armel';
       break;

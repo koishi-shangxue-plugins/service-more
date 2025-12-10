@@ -2,6 +2,22 @@
   "name": "koishi-plugin-ffmpeg-path",
   "version": "1.1.2",
   "description": "允许指定 FFmpeg 可执行文件路径，或自动下载 FFmpeg。个人使用咪~ 会在[PR11](https://github.com/koishijs/koishi-plugin-ffmpeg/pull/11) 通过时 移除本插件。",
+  "main": "lib/index.js",
+  "typings": "lib/index.d.ts",
+  "files": [
+    "lib",
+    "nereid",
+    "src"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/koishi-shangxue-plugins/service-more.git"
+  },
+  "bugs": {
+    "url": "https://github.com/koishi-shangxue-plugins/service-more/issues"
+  },
+  "homepage": "https://github.com/koishi-shangxue-plugins/service-more",
   "keywords": [
     "koishi",
     "plugin",
@@ -9,18 +25,6 @@
     "path",
     "termux"
   ],
-  "main": "lib/index.js",
-  "typings": "lib/index.d.ts",
-  "license": "MIT",
-  "files": [
-    "lib",
-    "nereid",
-    "src"
-  ],
-  "homepage": "https://github.com/koishi-shangxue-plugins/koishi-shangxue-apps/tree/main/",
-  "bugs": {
-    "url": "https://github.com/koishi-shangxue-plugins/koishi-shangxue-apps/issues"
-  },
   "dependencies": {
     "get-registry": "^1.1.0"
   },
