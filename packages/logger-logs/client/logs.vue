@@ -1,110 +1,190 @@
 <template>
-  <virtual-list class="log-list k-text-selectable" :data="logs" :count="300" :max-height="maxHeight">
-    <template #="record">
-      <div :class="{ line: true, start: isStart(record) }">
-        <code v-html="renderLine(record)"></code>
-        <router-link class="log-link inline-flex items-center justify-center absolute w-20px h-20px bottom-0 right-0"
-          v-if="showLink && store.config && store.packages && record.meta?.paths?.length"
-          :to="'/plugins/' + record.meta.paths[0].replace(/\./, '/')">
-          <k-icon name="arrow-right" />
-        </router-link>
+  <div class="log-container" ref="containerEl">
+    <!-- 顶部控制栏：搜索框 -->
+    <div class="log-header">
+      <el-input v-model="searchQuery" placeholder="搜索日志..." clearable size="small" :prefix-icon="Search" />
+    </div>
+
+    <!-- 日志主体：使用 ElScrollbar 实现自定义滚动 -->
+    <el-scrollbar ref="scrollbarRef" @scroll="handleScroll" class="log-body">
+      <div class="log-list">
+        <!-- 虚拟列表的内容 -->
+        <div v-for="log in filteredLogs" :key="log.id" class="log-item">
+          <span class="log-time" v-html="renderTime(log)"></span>
+          <span class="log-name" v-html="renderName(log)"></span>
+          <pre class="log-content" v-html="renderContent(log)"></pre>
+        </div>
       </div>
-    </template>
-  </virtual-list>
+    </el-scrollbar>
+
+    <!-- 滚动到底部按钮 -->
+    <transition name="fade">
+      <el-button v-if="showScrollToBottom" class="scroll-to-bottom" type="primary" circle :icon="ArrowDown"
+        @click="scrollToBottom" />
+    </transition>
+  </div>
 </template>
 
 <script lang="ts" setup>
-
-import { Time, store, VirtualList } from '@koishijs/client';
-import { } from '@koishijs/plugin-config';
+import { ref, watch, computed, nextTick } from 'vue';
+import { Time } from '@koishijs/client';
 import Logger from 'reggol';
 import ansi from 'ansi_up';
+import { ElScrollbar, ElInput, ElButton } from 'element-plus';
+import { Search, ArrowDown } from '@element-plus/icons-vue';
 
 const props = defineProps<{
-  logs: Logger.Record[],
-  showLink?: boolean,
-  maxHeight?: string,
+  logs: Logger.Record[];
 }>();
 
-// this package does not have consistent exports in different environments
+// 模板引用
+const scrollbarRef = ref<InstanceType<typeof ElScrollbar>>();
+const containerEl = ref<HTMLDivElement>();
+
+// 状态变量
+const searchQuery = ref('');
+const isNearBottom = ref(true); // 默认在底部
+const showScrollToBottom = ref(false);
+
+// ANSI 转换器
 const converter = new (ansi['default'] || ansi)();
 
-function renderColor(code: number, value: any, decoration = '')
+// 通过搜索查询过滤日志
+const filteredLogs = computed(() =>
 {
-  return `\u001b[3${code < 8 ? code : '8;5;' + code}${decoration}m${value}\u001b[0m`;
-}
+  if (!searchQuery.value)
+  {
+    return props.logs;
+  }
+  const query = searchQuery.value.toLowerCase();
+  return props.logs.filter(log =>
+    log.content.toLowerCase().includes(query) ||
+    log.name.toLowerCase().includes(query)
+  );
+});
 
+// 监听日志和过滤器的变化
+watch([filteredLogs, () => props.logs.length], () =>
+{
+  // 检查用户是否正在选择文本
+  const selection = window.getSelection();
+  const isSelecting = selection && selection.type === 'Range' && selection.toString().length > 0;
+
+  if (isNearBottom.value && !isSelecting)
+  {
+    scrollToBottom();
+  }
+});
+
+// 滚动事件处理器
+const handleScroll = ({ scrollTop, scrollLeft }) =>
+{
+  const scrollbar = scrollbarRef.value;
+  if (!scrollbar || !scrollbar.wrapRef) return;
+
+  const el = scrollbar.wrapRef;
+  const scrollHeight = el.scrollHeight;
+  const clientHeight = el.clientHeight;
+  // 计算距离底部的距离 (50条日志 * 20px/条 约等于 1000px)
+  const bottomThreshold = 1000;
+
+  isNearBottom.value = scrollHeight - scrollTop - clientHeight < bottomThreshold;
+  showScrollToBottom.value = !isNearBottom.value;
+};
+
+// 滚动到底部
+const scrollToBottom = () =>
+{
+  nextTick(() =>
+  {
+    scrollbarRef.value?.scrollTo({ top: scrollbarRef.value?.wrapRef?.scrollHeight, behavior: 'smooth' });
+  });
+};
+
+// 渲染函数
+const renderColor = (code: number, value: any, decoration = '') => `\u001b[3${code < 8 ? code : '8;5;' + code}${decoration}m${value}\u001b[0m`;
 const showTime = 'yyyy-MM-dd hh:mm:ss';
-
-function isStart(record: Logger.Record & { index: number; })
-{
-  return record.index && props.logs[record.index - 1].id > record.id && record.name === 'app';
-}
-
-function renderLine(record: Logger.Record)
+const renderTime = (record: Logger.Record) => converter.ansi_to_html(renderColor(8, Time.template(showTime, new Date(record.timestamp))));
+const renderName = (record: Logger.Record) =>
 {
   const prefix = `[${record.type[0].toUpperCase()}]`;
-  const space = ' ';
-  let indent = 3 + space.length, output = '';
-  indent += showTime.length + space.length;
-  output += renderColor(8, Time.template(showTime, new Date(record.timestamp))) + space;
   const code = Logger.code(record.name, { colors: 3 });
   const label = renderColor(code, record.name, ';1');
-  const padLength = label.length - record.name.length;
-  output += prefix + space + label.padEnd(padLength) + space;
-  output += record.content.replace(/\n/g, '\n' + ' '.repeat(indent));
-  return converter.ansi_to_html(output);
-}
+  return converter.ansi_to_html(`${prefix} ${label}`);
+};
+const renderContent = (record: Logger.Record) => converter.ansi_to_html(record.content)
 
 </script>
 
 <style lang="scss" scoped>
-.log-list {
-  color: var(--terminal-fg);
+.log-container {
+  height: 100%;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
   background-color: var(--terminal-bg);
+  color: var(--terminal-fg);
+  position: relative;
+}
 
-  :deep(.el-scrollbar__view) {
-    padding: 1rem 1rem;
-  }
+.log-header {
+  padding: 8px 12px;
+  background-color: var(--k-card-bg);
+  border-bottom: 1px solid var(--k-border-color);
+}
 
-  .line.start {
-    margin-top: 1rem;
+.log-body {
+  flex-grow: 1;
+}
 
-    &::before {
-      content: '';
-      position: absolute;
-      left: 0;
-      right: 0;
-      top: -0.5rem;
-      border-top: 1px solid var(--terminal-separator);
-    }
-  }
+.log-list {
+  padding: 8px 12px;
+}
 
-  .line:first-child {
-    margin-top: 0;
+.log-item {
+  display: flex;
+  align-items: baseline;
+  line-height: 1.5;
+  padding: 1px 0;
+  /* 减小垂直 padding 来使行间距更紧凑 */
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
+  /* 强制统一字体 */
+}
 
-    &::before {
-      display: none;
-    }
-  }
+.log-time {
+  flex-shrink: 0;
+  width: 160px;
+}
 
-  .line {
-    padding: 0 0.5rem;
-    border-radius: 2px;
-    font-size: 14px;
-    line-height: 20px;
-    white-space: pre-wrap;
-    word-break: break-all;
-    position: relative;
+.log-name {
+  flex-shrink: 0;
+  width: 180px;
+  margin-left: 12px;
+  font-weight: bold;
+}
 
-    &:hover {
-      color: var(--terminal-fg-hover);
-      background-color: var(--terminal-bg-hover);
-    }
+.log-content {
+  flex-grow: 1;
+  margin: 0;
+  /* 移除 pre 标签的默认 margin */
+  margin-left: 12px;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
 
-    ::selection {
-      background-color: var(--terminal-bg-selection);
-    }
-  }
+.scroll-to-bottom {
+  position: absolute;
+  right: 20px;
+  bottom: 20px;
+}
+
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
 }
 </style>
