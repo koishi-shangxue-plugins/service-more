@@ -3,7 +3,7 @@
     <h2 class="k-schema-header">
       运行日志
     </h2>
-    <logs class="settings-logger" :logs="logs" max-height="216px" />
+    <simple-logs class="settings-logger" :logs="logs" max-height="216px" />
   </template>
 </template>
 
@@ -11,7 +11,7 @@
 
 import { store } from '@koishijs/client';
 import { inject, computed } from 'vue';
-import Logs from './logs.vue';
+import SimpleLogs from './simple-logs.vue';
 
 const current: any = inject('manager.settings.current');
 
@@ -24,7 +24,7 @@ const logs = computed(() =>
   {
     if (store.logs[index].id >= last) break;
     last = store.logs[index].id;
-    if (!store.logs[index].meta?.paths?.includes(current.value.path)) continue;
+    if (!(store.logs[index].meta as any)?.paths?.includes(current.value.path)) continue;
     results.unshift(store.logs[index]);
   }
   return results;
