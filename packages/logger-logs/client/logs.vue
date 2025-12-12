@@ -41,7 +41,7 @@
       <virtual-list ref="virtualListRef" :data="sortedLogs" :count="100" class="virtual-list-container"
         :style="{ height: listHeight + 'px' }">
         <template #default="log">
-          <div class="log-item">
+          <div class="log-item" :data-log-id="log.id">
             <div class="log-cell time-col" v-html="renderTime(log)"></div>
             <div class="log-cell name-col" v-html="renderName(log)"></div>
             <div class="log-cell content-col" v-html="renderContent(log)"></div>
@@ -76,16 +76,16 @@ const isPaused = ref(false);
 const snapshotLogs = ref<Logger.Record[]>([]);
 const sortKey = ref<'time' | 'name' | null>(null);
 const sortOrder = ref<'asc' | 'desc'>('asc');
-const timeWidth = ref(170); // 调整为更紧凑的时间列宽
-const nameWidth = ref(240); // 增加来源列宽以适应较长的插件名
+const timeWidth = ref(170);
+const nameWidth = ref(240);
 const showScrollToBottom = ref(false);
 const isNearBottom = ref(true);
-const listHeight = ref(0); // 动态计算列表高度
+const listHeight = ref(0);
 
 // --- 模板引用 ---
 const containerEl = ref<HTMLElement>();
 const virtualListRef = ref();
-const logBodyRef = ref<HTMLElement>(); // 新增引用
+const logBodyRef = ref<HTMLElement>();
 let scrollableEl: HTMLElement | null = null;
 let resizeObserver: ResizeObserver | null = null;
 
@@ -165,7 +165,7 @@ const startResize = (e: MouseEvent, col: 'time' | 'name') =>
   const onMouseMove = (moveEvent: MouseEvent) =>
   {
     const diff = moveEvent.clientX - startX;
-    const newWidth = Math.max(50, startWidth + diff); // 最小宽度 50px
+    const newWidth = Math.max(50, startWidth + diff);
     if (col === 'time') timeWidth.value = newWidth;
     else nameWidth.value = newWidth;
   };
@@ -227,7 +227,6 @@ watch(() => props.logs.length, () =>
   const selection = window.getSelection();
   const isSelecting = selection && selection.type === 'Range' && selection.toString().length > 0;
 
-  // 只有在底部、没有选择文本、且没有处于排序状态（通常看新日志时不希望排序打乱）时才自动滚动
   if (isNearBottom.value && !isSelecting && !sortKey.value)
   {
     nextTick(scrollToBottom);
@@ -237,7 +236,6 @@ watch(() => props.logs.length, () =>
 // --- 生命周期 ---
 onMounted(() =>
 {
-  // 1. 初始化 ResizeObserver 以动态计算列表高度
   if (logBodyRef.value)
   {
     resizeObserver = new ResizeObserver((entries) =>
@@ -250,7 +248,6 @@ onMounted(() =>
     resizeObserver.observe(logBodyRef.value);
   }
 
-  // 2. 获取 VirtualList 内部的滚动容器
   const el = virtualListRef.value?.$el;
   if (el)
   {
@@ -261,6 +258,8 @@ onMounted(() =>
       scrollableEl.scrollTop = scrollableEl.scrollHeight;
     }
   }
+
+  containerEl.value?.addEventListener('copy', handleCopy);
 });
 
 onBeforeUnmount(() =>
@@ -273,6 +272,7 @@ onBeforeUnmount(() =>
   {
     scrollableEl.removeEventListener('scroll', handleScroll);
   }
+  containerEl.value?.removeEventListener('copy', handleCopy);
 });
 
 // --- 渲染函数 ---
@@ -286,7 +286,51 @@ const renderName = (record: Logger.Record) =>
   const label = renderColor(code, record.name, ';1');
   return converter.ansi_to_html(`${prefix} ${label}`);
 };
-const renderContent = (record: Logger.Record) => converter.ansi_to_html(record.content)
+const renderContent = (record: Logger.Record) => converter.ansi_to_html(record.content);
+
+// --- 复制事件处理 ---
+const formatCopyText = (record: Logger.Record) =>
+{
+  const time = Time.template(showTime, new Date(record.timestamp));
+  const prefix = `[${record.type[0].toUpperCase()}]`;
+  const cleanContent = record.content.replace(/\u001b\[[0-9;]*m/g, '');
+  return `${time} ${prefix} ${record.name} ${cleanContent}`;
+};
+
+const handleCopy = (event: ClipboardEvent) =>
+{
+  const selection = window.getSelection();
+  if (!selection || selection.rangeCount === 0) return;
+
+  const range = selection.getRangeAt(0);
+  const selectedNodes = Array.from(range.cloneContents().childNodes);
+
+  const selectedLogItems = new Set<HTMLElement>();
+  selectedNodes.forEach(node =>
+  {
+    let el = node.nodeType === 3 ? node.parentElement : node as HTMLElement;
+    while (el && !el.classList.contains('log-item'))
+    {
+      el = el.parentElement;
+    }
+    if (el) selectedLogItems.add(el);
+  });
+
+  if (selectedLogItems.size === 0) return;
+
+  event.preventDefault();
+
+  const textToCopy = Array.from(selectedLogItems)
+    .map(item =>
+    {
+      const logId = Number(item.dataset.logId);
+      const log = sortedLogs.value.find(l => l.id === logId);
+      return log ? formatCopyText(log) : '';
+    })
+    .join('\n');
+
+  event.clipboardData?.setData('text/plain', textToCopy);
+};
 
 </script>
 
@@ -324,7 +368,6 @@ const renderContent = (record: Logger.Record) => converter.ansi_to_html(record.c
   user-select: none;
   flex-shrink: 0;
   color: var(--k-text-active);
-  /* 确保表头文字在浅色模式下可见 */
 }
 
 .header-cell {
@@ -361,7 +404,6 @@ const renderContent = (record: Logger.Record) => converter.ansi_to_html(record.c
   flex-grow: 1;
   overflow: hidden;
   position: relative;
-  /* 确保 ResizeObserver 能正确测量 */
 }
 
 .virtual-list-container {
@@ -374,15 +416,12 @@ const renderContent = (record: Logger.Record) => converter.ansi_to_html(record.c
   line-height: 1.5;
   padding: 1px 0;
   border-bottom: 1px solid transparent;
-  /* 占位，避免抖动 */
 
   &:hover {
-    /* 使用半透明背景色，这样在深色和浅色模式下都能叠加出合适的效果，而不会完全覆盖文字颜色 */
     background-color: rgba(128, 128, 128, 0.1);
   }
 }
 
-/* 列样式 */
 .time-col {
   width: var(--time-width);
   flex-shrink: 0;
@@ -392,7 +431,6 @@ const renderContent = (record: Logger.Record) => converter.ansi_to_html(record.c
   overflow: hidden;
   text-overflow: ellipsis;
   border-right: 1px solid transparent;
-  /* 可选：列分割线 */
 }
 
 .name-col {
@@ -411,10 +449,8 @@ const renderContent = (record: Logger.Record) => converter.ansi_to_html(record.c
   white-space: pre-wrap;
   word-break: break-all;
   min-width: 0;
-  /* 防止 flex 子项溢出 */
 }
 
-/* 强制所有子元素继承字体 */
 .log-cell :deep(*) {
   font-family: inherit;
 }
