@@ -3,6 +3,10 @@
     :style="{ '--time-width': timeWidth + 'px', '--name-width': nameWidth + 'px' }">
     <!-- 顶部控制栏：搜索框 -->
     <div class="log-toolbar">
+      <el-button :type="isPaused ? 'success' : 'warning'" :icon="isPaused ? VideoPlay : VideoPause" @click="togglePause"
+        size="small" class="freeze-btn">
+        {{ isPaused ? '恢复刷新' : '冻结日志' }}
+      </el-button>
       <el-input v-model="searchQuery" placeholder="搜索日志..." clearable size="small" :prefix-icon="Search" />
     </div>
 
@@ -60,7 +64,7 @@ import { Time, VirtualList } from '@koishijs/client';
 import Logger from 'reggol';
 import ansi from 'ansi_up';
 import { ElInput, ElButton, ElIcon } from 'element-plus';
-import { Search, ArrowDown, CaretTop, CaretBottom } from '@element-plus/icons-vue';
+import { Search, ArrowDown, CaretTop, CaretBottom, VideoPause, VideoPlay } from '@element-plus/icons-vue';
 
 const props = defineProps<{
   logs: Logger.Record[];
@@ -68,6 +72,8 @@ const props = defineProps<{
 
 // --- 状态变量 ---
 const searchQuery = ref('');
+const isPaused = ref(false);
+const snapshotLogs = ref<Logger.Record[]>([]);
 const sortKey = ref<'time' | 'name' | null>(null);
 const sortOrder = ref<'asc' | 'desc'>('asc');
 const timeWidth = ref(170); // 调整为更紧凑的时间列宽
@@ -87,15 +93,31 @@ let resizeObserver: ResizeObserver | null = null;
 const converter = new (ansi['default'] || ansi)();
 
 // --- 过滤与排序 ---
+const effectiveLogs = computed(() => isPaused.value ? snapshotLogs.value : props.logs);
+
 const filteredLogs = computed(() =>
 {
-  if (!searchQuery.value) return props.logs;
+  const logs = effectiveLogs.value;
+  if (!searchQuery.value) return logs;
   const query = searchQuery.value.toLowerCase();
-  return props.logs.filter(log =>
+  return logs.filter(log =>
     log.content.toLowerCase().includes(query) ||
     log.name.toLowerCase().includes(query)
   );
 });
+
+const togglePause = () =>
+{
+  isPaused.value = !isPaused.value;
+  if (isPaused.value)
+  {
+    snapshotLogs.value = [...props.logs];
+  } else
+  {
+    snapshotLogs.value = [];
+    nextTick(scrollToBottom);
+  }
+};
 
 const sortedLogs = computed(() =>
 {
@@ -285,6 +307,12 @@ const renderContent = (record: Logger.Record) => converter.ansi_to_html(record.c
   background-color: var(--k-card-bg);
   border-bottom: 1px solid var(--k-border-color);
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+}
+
+.freeze-btn {
+  margin-right: 12px;
 }
 
 .log-header-row {
