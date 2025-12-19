@@ -1,7 +1,7 @@
 {
   "name": "koishi-plugin-logger-logs",
   "description": "Dump log files for Koishi",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "main": "lib/index.js",
   "typings": "lib/index.d.ts",
   "files": [
@@ -31,8 +31,8 @@
       "dist"
     ],
     "description": {
-      "en": "Dump log files and show them in the console",
-      "zh": "保存日志文件并在控制台中显示"
+      "en": "Dump log files and show them in the console.",
+      "zh": "保存日志文件并在控制台中显示。"
     },
     "service": {
       "optional": [
