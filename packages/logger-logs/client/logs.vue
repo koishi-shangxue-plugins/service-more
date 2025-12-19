@@ -1,53 +1,90 @@
 <template>
-  <div class="log-container" ref="containerEl"
-    :style="{ '--time-width': timeWidth + 'px', '--name-width': nameWidth + 'px' }">
-    <!-- 顶部控制栏：搜索框 -->
+  <div class="log-container" ref="containerEl">
+    <!-- 顶部控制栏：搜索框和复制按钮 -->
     <div class="log-toolbar">
-      <el-button :type="isPaused ? 'success' : 'warning'" :icon="isPaused ? VideoPlay : VideoPause" @click="togglePause"
-        size="small" class="freeze-btn">
-        {{ isPaused ? '恢复刷新' : '冻结日志' }}
-      </el-button>
-      <el-input v-model="searchQuery" placeholder="搜索日志..." clearable size="small" :prefix-icon="Search" />
+      <div class="toolbar-left">
+        <el-button :type="isPaused ? 'success' : 'warning'" :icon="isPaused ? VideoPlay : VideoPause"
+          @click="togglePause" size="default" class="action-btn freeze-btn">
+          {{ isPaused ? '恢复刷新' : '冻结日志' }}
+        </el-button>
+        <el-button v-if="selectedLogs.size > 0" type="primary" :icon="CopyDocument" @click="copySelectedLogs"
+          size="default" class="action-btn copy-btn">
+          复制选中 ({{ selectedLogs.size }})
+        </el-button>
+      </div>
+      <el-input v-model="searchQuery" placeholder="搜索日志内容或来源..." clearable size="default" :prefix-icon="Search"
+        class="search-input" />
     </div>
 
-    <!-- 表头：支持排序和列宽调整 -->
-    <div class="log-header-row">
-      <!-- 时间列 -->
-      <div class="header-cell time-col" @click="toggleSort('time')">
-        <span>时间</span>
-        <el-icon v-if="sortKey === 'time'" class="sort-icon">
-          <component :is="sortOrder === 'asc' ? CaretTop : CaretBottom" />
-        </el-icon>
-        <div class="resizer" @click.stop @mousedown="startResize($event, 'time')"></div>
-      </div>
-
-      <!-- 名称列 -->
-      <div class="header-cell name-col" @click="toggleSort('name')">
-        <span>来源</span>
-        <el-icon v-if="sortKey === 'name'" class="sort-icon">
-          <component :is="sortOrder === 'asc' ? CaretTop : CaretBottom" />
-        </el-icon>
-        <div class="resizer" @click.stop @mousedown="startResize($event, 'name')"></div>
-      </div>
-
-      <!-- 内容列 -->
-      <div class="header-cell content-col">
-        <span>消息内容</span>
-      </div>
-    </div>
-
-    <!-- 日志主体：使用 VirtualList 实现高性能渲染 -->
-    <div class="log-body" ref="logBodyRef">
-      <virtual-list ref="virtualListRef" :data="sortedLogs" :count="100" class="virtual-list-container"
-        :style="{ height: listHeight + 'px' }">
-        <template #default="log">
-          <div class="log-item" :data-log-id="log.id">
-            <div class="log-cell time-col" v-html="renderTime(log)"></div>
-            <div class="log-cell name-col" v-html="renderName(log)"></div>
-            <div class="log-cell content-col" v-html="renderContent(log)"></div>
+    <!-- 滚动容器：支持横向滚动 -->
+    <div class="log-scroll-container">
+      <div class="log-table-wrapper" :style="{
+        '--time-width': timeWidth + 'px',
+        '--name-width': nameWidth + 'px',
+        '--checkbox-width': checkboxWidth + 'px',
+        'min-width': tableMinWidth
+      }">
+        <!-- 表头 -->
+        <div class="log-header-row">
+          <div class="header-cell checkbox-col">
+            <el-checkbox v-model="selectAll" @change="toggleSelectAll" :indeterminate="isIndeterminate" />
           </div>
-        </template>
-      </virtual-list>
+
+          <div class="header-cell time-col" @click="toggleSort('time')">
+            <span>时间</span>
+            <el-icon v-if="sortKey === 'time'" class="sort-icon">
+              <component :is="sortOrder === 'asc' ? CaretTop : CaretBottom" />
+            </el-icon>
+            <div class="resizer" @click.stop @mousedown="startResize($event, 'time')"
+              @touchstart.stop.passive="startResize($event, 'time')"></div>
+          </div>
+
+          <div class="header-cell name-col p-0!">
+            <el-dropdown trigger="click" @command="handleLevelFilter" class="w-full h-full">
+              <div class="level-filter-trigger w-full h-full flex items-center px-12px">
+                来源 <el-icon class="el-icon--right">
+                  <ArrowDown />
+                </el-icon>
+              </div>
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item command="ALL"
+                    :class="{ 'is-active': levelFilter === 'ALL' }">ALL（全部）</el-dropdown-item>
+                  <el-dropdown-item command="I" :class="{ 'is-active': levelFilter === 'I' }">I（信息）</el-dropdown-item>
+                  <el-dropdown-item command="W" :class="{ 'is-active': levelFilter === 'W' }">W（警告）</el-dropdown-item>
+                  <el-dropdown-item command="E" :class="{ 'is-active': levelFilter === 'E' }">E（错误）</el-dropdown-item>
+                  <el-dropdown-item command="D" :class="{ 'is-active': levelFilter === 'D' }">D（调试）</el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
+            <div class="resizer" @click.stop @mousedown="startResize($event, 'name')"
+              @touchstart.stop.passive="startResize($event, 'name')"></div>
+          </div>
+
+          <div class="header-cell content-col">
+            <span>消息内容</span>
+          </div>
+        </div>
+
+        <!-- 日志主体 -->
+        <div class="log-body" ref="logBodyRef">
+          <virtual-list ref="virtualListRef" :data="sortedLogs" :count="100" class="virtual-list-container"
+            :style="{ height: listHeight + 'px' }">
+            <template #default="log">
+              <div class="log-item" :data-log-id="log.id" @dblclick="handleDblClick(log.id)"
+                @click="handleRowClick(log.id)">
+                <div class="log-cell checkbox-col">
+                  <el-checkbox :model-value="selectedLogs.has(log.id)" @change="toggleLogSelection(log.id)"
+                    @click.stop />
+                </div>
+                <div class="log-cell time-col" v-html="renderTime(log)"></div>
+                <div class="log-cell name-col" v-html="renderName(log)"></div>
+                <div class="log-cell content-col" v-html="renderContent(log)"></div>
+              </div>
+            </template>
+          </virtual-list>
+        </div>
+      </div>
     </div>
 
     <!-- 滚动到底部按钮 -->
@@ -60,11 +97,11 @@
 
 <script lang="ts" setup>
 import { ref, watch, computed, onMounted, onBeforeUnmount, nextTick } from 'vue';
-import { Time, VirtualList } from '@koishijs/client';
+import { Time, VirtualList, message } from '@koishijs/client';
 import Logger from 'reggol';
 import ansi from 'ansi_up';
-import { ElInput, ElButton, ElIcon } from 'element-plus';
-import { Search, ArrowDown, CaretTop, CaretBottom, VideoPause, VideoPlay } from '@element-plus/icons-vue';
+import { ElInput, ElButton, ElIcon, ElCheckbox, ElDropdown, ElDropdownMenu, ElDropdownItem } from 'element-plus';
+import { Search, ArrowDown, CaretTop, CaretBottom, VideoPause, VideoPlay, CopyDocument } from '@element-plus/icons-vue';
 
 const props = defineProps<{
   logs: Logger.Record[];
@@ -76,11 +113,22 @@ const isPaused = ref(false);
 const snapshotLogs = ref<Logger.Record[]>([]);
 const sortKey = ref<'time' | 'name' | null>(null);
 const sortOrder = ref<'asc' | 'desc'>('asc');
+const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 const timeWidth = ref(170);
 const nameWidth = ref(240);
+const checkboxWidth = ref(40);
 const showScrollToBottom = ref(false);
 const isNearBottom = ref(true);
 const listHeight = ref(0);
+const levelFilter = ref<'ALL' | 'I' | 'W' | 'E' | 'D'>('ALL');
+const selectedLogs = ref<Set<number>>(new Set());
+const selectAll = ref(false);
+
+const tableMinWidth = computed(() =>
+{
+  // 保证在移动端也有足够的横向滚动宽度
+  return (timeWidth.value + nameWidth.value + checkboxWidth.value + 400) + 'px';
+});
 
 // --- 模板引用 ---
 const containerEl = ref<HTMLElement>();
@@ -97,7 +145,16 @@ const effectiveLogs = computed(() => isPaused.value ? snapshotLogs.value : props
 
 const filteredLogs = computed(() =>
 {
-  const logs = effectiveLogs.value;
+  let logs = effectiveLogs.value;
+
+  // 日志级别筛选
+  if (levelFilter.value !== 'ALL')
+  {
+    const filterType = levelFilter.value.toLowerCase();
+    logs = logs.filter(log => log.type[0].toLowerCase() === filterType);
+  }
+
+  // 搜索筛选
   if (!searchQuery.value) return logs;
   const query = searchQuery.value.toLowerCase();
   return logs.filter(log =>
@@ -143,6 +200,97 @@ const sortedLogs = computed(() =>
   });
 });
 
+// --- 日志级别筛选 ---
+const handleLevelFilter = (command: 'ALL' | 'I' | 'W' | 'E' | 'D') =>
+{
+  levelFilter.value = command;
+  selectedLogs.value.clear();
+  selectAll.value = false;
+};
+
+// --- 选择逻辑 ---
+const isIndeterminate = computed(() =>
+{
+  const size = selectedLogs.value.size;
+  return size > 0 && size < sortedLogs.value.length;
+});
+
+const toggleSelectAll = (checked: boolean) =>
+{
+  if (checked)
+  {
+    sortedLogs.value.forEach(log => selectedLogs.value.add(log.id));
+  } else
+  {
+    selectedLogs.value.clear();
+  }
+  selectedLogs.value = new Set(selectedLogs.value);
+};
+
+const toggleLogSelection = (logId: number) =>
+{
+  if (selectedLogs.value.has(logId))
+  {
+    selectedLogs.value.delete(logId);
+  } else
+  {
+    selectedLogs.value.add(logId);
+  }
+
+  // 触发响应式更新
+  selectedLogs.value = new Set(selectedLogs.value);
+
+  // 更新全选状态
+  if (selectedLogs.value.size === 0)
+  {
+    selectAll.value = false;
+  } else if (selectedLogs.value.size === sortedLogs.value.length)
+  {
+    selectAll.value = true;
+  }
+};
+
+const handleDblClick = (logId: number) =>
+{
+  // 双击切换勾选状态
+  toggleLogSelection(logId);
+};
+
+let lastClickTime = 0;
+const handleRowClick = (logId: number) =>
+{
+  if (isMobile)
+  {
+    const now = Date.now();
+    // 模拟双击逻辑，因为某些手机浏览器对 dblclick 支持不佳
+    if (now - lastClickTime < 300)
+    {
+      toggleLogSelection(logId);
+      lastClickTime = 0;
+    } else
+    {
+      lastClickTime = now;
+    }
+  }
+};
+
+const copySelectedLogs = async () =>
+{
+  const selectedLogRecords = sortedLogs.value.filter(log => selectedLogs.value.has(log.id));
+  if (selectedLogRecords.length === 0) return;
+
+  const textToCopy = selectedLogRecords.map(log => formatCopyText(log)).join('\n');
+
+  try
+  {
+    await navigator.clipboard.writeText(textToCopy);
+    message.success(`已复制 ${selectedLogRecords.length} 条日志`);
+  } catch (error)
+  {
+    message.error('复制失败');
+  }
+};
+
 // --- 排序逻辑 ---
 const toggleSort = (key: 'time' | 'name') =>
 {
@@ -157,28 +305,33 @@ const toggleSort = (key: 'time' | 'name') =>
 };
 
 // --- 列宽调整逻辑 ---
-const startResize = (e: MouseEvent, col: 'time' | 'name') =>
+const startResize = (e: MouseEvent | TouchEvent, col: 'time' | 'name') =>
 {
-  const startX = e.clientX;
+  const startX = 'clientX' in e ? e.clientX : e.touches[0].clientX;
   const startWidth = col === 'time' ? timeWidth.value : nameWidth.value;
 
-  const onMouseMove = (moveEvent: MouseEvent) =>
+  const onMove = (moveEvent: MouseEvent | TouchEvent) =>
   {
-    const diff = moveEvent.clientX - startX;
+    const currentX = 'clientX' in moveEvent ? moveEvent.clientX : moveEvent.touches[0].clientX;
+    const diff = currentX - startX;
     const newWidth = Math.max(50, startWidth + diff);
     if (col === 'time') timeWidth.value = newWidth;
     else nameWidth.value = newWidth;
   };
 
-  const onMouseUp = () =>
+  const onEnd = () =>
   {
-    window.removeEventListener('mousemove', onMouseMove);
-    window.removeEventListener('mouseup', onMouseUp);
+    window.removeEventListener('mousemove', onMove);
+    window.removeEventListener('mouseup', onEnd);
+    window.removeEventListener('touchmove', onMove);
+    window.removeEventListener('touchend', onEnd);
     document.body.style.cursor = '';
   };
 
-  window.addEventListener('mousemove', onMouseMove);
-  window.addEventListener('mouseup', onMouseUp);
+  window.addEventListener('mousemove', onMove);
+  window.addEventListener('mouseup', onEnd);
+  window.addEventListener('touchmove', onMove, { passive: false });
+  window.addEventListener('touchend', onEnd);
   document.body.style.cursor = 'col-resize';
 };
 
@@ -233,6 +386,47 @@ watch(() => props.logs.length, () =>
   }
 });
 
+// 鼠标松开时，如果选择了文字，切换对应日志的勾选状态
+const handleMouseUp = () =>
+{
+  const selection = window.getSelection();
+  if (!selection || selection.isCollapsed) return;
+
+  const container = logBodyRef.value;
+  if (!container) return;
+
+  const items = container.querySelectorAll('.log-item');
+
+  let changed = false;
+  items.forEach(item =>
+  {
+    if (selection.containsNode(item, true))
+    {
+      const logId = Number((item as HTMLElement).dataset.logId);
+      if (!isNaN(logId))
+      {
+        // 切换状态
+        if (selectedLogs.value.has(logId))
+        {
+          selectedLogs.value.delete(logId);
+        } else
+        {
+          selectedLogs.value.add(logId);
+        }
+        changed = true;
+      }
+    }
+  });
+
+  if (changed)
+  {
+    selectedLogs.value = new Set(selectedLogs.value);
+    // 更新全选状态
+    selectAll.value = selectedLogs.value.size === sortedLogs.value.length;
+    // 不再清除文字选中，允许用户继续复制
+  }
+};
+
 // --- 生命周期 ---
 onMounted(() =>
 {
@@ -246,6 +440,7 @@ onMounted(() =>
       }
     });
     resizeObserver.observe(logBodyRef.value);
+    logBodyRef.value.addEventListener('mouseup', handleMouseUp);
   }
 
   const el = virtualListRef.value?.$el;
@@ -258,8 +453,6 @@ onMounted(() =>
       scrollableEl.scrollTop = scrollableEl.scrollHeight;
     }
   }
-
-  containerEl.value?.addEventListener('copy', handleCopy);
 });
 
 onBeforeUnmount(() =>
@@ -272,7 +465,7 @@ onBeforeUnmount(() =>
   {
     scrollableEl.removeEventListener('scroll', handleScroll);
   }
-  containerEl.value?.removeEventListener('copy', handleCopy);
+  logBodyRef.value?.removeEventListener('mouseup', handleMouseUp);
 });
 
 // --- 渲染函数 ---
@@ -286,7 +479,28 @@ const renderName = (record: Logger.Record) =>
   const label = renderColor(code, record.name, ';1');
   return converter.ansi_to_html(`${prefix} ${label}`);
 };
-const renderContent = (record: Logger.Record) => converter.ansi_to_html(record.content);
+
+// 格式化错误堆栈，在 "at " 前添加换行
+const formatStackTrace = (content: string): string =>
+{
+  // 匹配 "at " 开头的堆栈行，排除 URL (at http://...)
+  // 使用正则：匹配 at 后面跟着空格，且后面不是 http/https/file 等协议
+  return content.replace(/(\s+)(at\s+(?!(https?|file|ftp|ws):\/\/))/g, '\n$2');
+};
+
+const renderContent = (record: Logger.Record) =>
+{
+  let content = record.content;
+
+  // 仅在非 info/success 级别且包含 " at " 时尝试格式化堆栈
+  const isErrorLike = record.type !== 'info' && record.type !== 'success';
+  if (isErrorLike && content.includes(' at '))
+  {
+    content = formatStackTrace(content);
+  }
+
+  return converter.ansi_to_html(content);
+};
 
 // --- 复制事件处理 ---
 const formatCopyText = (record: Logger.Record) =>
@@ -297,44 +511,19 @@ const formatCopyText = (record: Logger.Record) =>
   return `${time} ${prefix} ${record.name} ${cleanContent}`;
 };
 
-const handleCopy = (event: ClipboardEvent) =>
-{
-  const selection = window.getSelection();
-  if (!selection || selection.rangeCount === 0) return;
-
-  const range = selection.getRangeAt(0);
-  const selectedNodes = Array.from(range.cloneContents().childNodes);
-
-  const selectedLogItems = new Set<HTMLElement>();
-  selectedNodes.forEach(node =>
-  {
-    let el = node.nodeType === 3 ? node.parentElement : node as HTMLElement;
-    while (el && !el.classList.contains('log-item'))
-    {
-      el = el.parentElement;
-    }
-    if (el) selectedLogItems.add(el);
-  });
-
-  if (selectedLogItems.size === 0) return;
-
-  event.preventDefault();
-
-  const textToCopy = Array.from(selectedLogItems)
-    .map(item =>
-    {
-      const logId = Number(item.dataset.logId);
-      const log = sortedLogs.value.find(l => l.id === logId);
-      return log ? formatCopyText(log) : '';
-    })
-    .join('\n');
-
-  event.clipboardData?.setData('text/plain', textToCopy);
-};
-
 </script>
 
 <style lang="scss" scoped>
+/* 使用 CDN 加载字体，支持多个源竞速 */
+@font-face {
+  font-family: 'MapleMono-NF-CN-Regular';
+  src: url('https://cdn.jsdmirror.com/gh/koishi-shangxue-plugins/koishi-plugins-assets-temp@main/plugins/fonts/raw/MapleMono-NF-CN-Regular.ttf') format('truetype'),
+    url('https://cdn.jsdelivr.net/gh/koishi-shangxue-plugins/koishi-plugins-assets-temp@main/plugins/fonts/raw/MapleMono-NF-CN-Regular.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
 .log-container {
   height: 100%;
   width: 100%;
@@ -343,20 +532,52 @@ const handleCopy = (event: ClipboardEvent) =>
   background-color: var(--terminal-bg);
   color: var(--terminal-fg);
   position: relative;
-  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
+  font-family: 'MapleMono-NF-CN-Regular', 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
 }
 
 .log-toolbar {
-  padding: 8px 12px;
+  padding: 12px 16px;
   background-color: var(--k-card-bg);
   border-bottom: 1px solid var(--k-border-color);
   flex-shrink: 0;
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  z-index: 20;
+
+  .toolbar-left {
+    display: flex;
+    gap: 8px;
+  }
+
+  .search-input {
+    max-width: 400px;
+    flex: 1;
+  }
+
+  .action-btn {
+    transition: all 0.3s ease;
+    font-weight: 500;
+
+    &:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    }
+  }
 }
 
-.freeze-btn {
-  margin-right: 12px;
+.log-scroll-container {
+  flex: 1;
+  overflow: auto;
+  background-color: var(--terminal-bg);
+}
+
+.log-table-wrapper {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
 }
 
 .log-header-row {
@@ -384,20 +605,57 @@ const handleCopy = (event: ClipboardEvent) =>
 
 .resizer {
   position: absolute;
-  right: 0;
+  right: -2px;
   top: 0;
   bottom: 0;
-  width: 4px;
+  width: 6px;
   cursor: col-resize;
-  z-index: 1;
+  z-index: 10;
+  transition: background-color 0.2s;
 
-  &:hover {
+  &::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 20%;
+    bottom: 20%;
+    width: 1px;
+    background-color: var(--k-border-color);
+    transform: translateX(-50%);
+  }
+
+  &:hover,
+  &:active {
     background-color: var(--k-primary);
+
+    &::after {
+      background-color: white;
+    }
   }
 }
 
 .sort-icon {
   margin-left: 4px;
+}
+
+.level-filter-trigger {
+  cursor: pointer;
+  user-select: none;
+  transition: color 0.2s;
+
+  &:hover {
+    color: var(--k-primary);
+  }
+}
+
+.checkbox-col {
+  width: var(--checkbox-width);
+  flex-shrink: 0;
+  padding-left: 12px;
+  padding-right: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .log-body {
@@ -416,6 +674,8 @@ const handleCopy = (event: ClipboardEvent) =>
   line-height: 1.5;
   padding: 1px 0;
   border-bottom: 1px solid transparent;
+  font-size: 0.9em;
+  /* 整体日志内容缩小至 90% */
 
   &:hover {
     background-color: rgba(128, 128, 128, 0.1);
@@ -425,12 +685,12 @@ const handleCopy = (event: ClipboardEvent) =>
 .time-col {
   width: var(--time-width);
   flex-shrink: 0;
-  padding-left: 12px;
   padding-right: 8px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  border-right: 1px solid transparent;
+  border-right: 1px solid var(--k-border-color);
+  color: var(--terminal-timestamp);
 }
 
 .name-col {
@@ -441,6 +701,7 @@ const handleCopy = (event: ClipboardEvent) =>
   overflow: hidden;
   text-overflow: ellipsis;
   font-weight: bold;
+  border-right: 1px solid var(--k-border-color);
 }
 
 .content-col {
@@ -470,5 +731,33 @@ const handleCopy = (event: ClipboardEvent) =>
 .fade-enter-from,
 .fade-leave-to {
   opacity: 0;
+}
+
+:deep(.el-dropdown-menu__item.is-active) {
+  color: var(--k-primary);
+  font-weight: bold;
+}
+
+@media (max-width: 768px) {
+  .log-toolbar {
+    padding: 8px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+
+    .toolbar-left {
+      justify-content: space-between;
+    }
+
+    .search-input {
+      max-width: none;
+    }
+  }
+
+  .resizer {
+    width: 16px;
+    /* 手机端加大触摸区域 */
+    right: -8px;
+  }
 }
 </style>
