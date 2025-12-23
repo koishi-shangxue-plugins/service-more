@@ -20,7 +20,6 @@
     <div class="log-scroll-container">
       <div class="log-table-wrapper" :style="{
         '--time-width': timeWidth + 'px',
-        '--name-width': nameWidth + 'px',
         '--checkbox-width': checkboxWidth + 'px',
         'min-width': tableMinWidth
       }">
@@ -595,14 +594,14 @@ const formatCopyText = (record: Logger.Record) =>
   background-color: var(--k-card-bg);
   border-bottom: 1px solid var(--k-border-color);
   font-weight: bold;
-  font-size: 12px;
+  font-size: 11px;
   user-select: none;
   flex-shrink: 0;
   color: var(--k-text-active);
 }
 
 .header-cell {
-  padding: 8px 12px;
+  padding: 6px 10px;
   position: relative;
   display: flex;
   align-items: center;
@@ -661,8 +660,7 @@ const formatCopyText = (record: Logger.Record) =>
 .checkbox-col {
   width: var(--checkbox-width);
   flex-shrink: 0;
-  padding-left: 12px;
-  padding-right: 8px;
+  padding: 0 6px 0 8px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -681,11 +679,11 @@ const formatCopyText = (record: Logger.Record) =>
 .log-item {
   display: flex;
   align-items: baseline;
-  line-height: 1.5;
-  padding: 1px 0;
+  line-height: 1.3;
+  padding: 2px 0;
   border-bottom: 1px solid transparent;
-  font-size: 0.9em;
-  /* 整体日志内容缩小至 90% */
+  font-size: 0.85em;
+  /* 整体日志内容缩小至 85% */
 
   &:hover {
     background-color: rgba(128, 128, 128, 0.1);
@@ -695,7 +693,7 @@ const formatCopyText = (record: Logger.Record) =>
 .time-col {
   width: var(--time-width);
   flex-shrink: 0;
-  padding-right: 8px;
+  padding: 0 8px 0 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -705,7 +703,7 @@ const formatCopyText = (record: Logger.Record) =>
 
 .content-col {
   flex-grow: 1;
-  padding-right: 12px;
+  padding: 0 12px 0 8px;
   white-space: pre-wrap;
   word-break: break-all;
   min-width: 0;
