@@ -128,6 +128,7 @@ export async function apply(ctx: Context, config: Config)
   createFile(date, Math.max(...files[date] ?? [0]) + 1);
 
   let buffer: Logger.Record[] = [];
+  let recordId = 0;
   const update = ctx.throttle(() =>
   {
     // Be very careful about accessing service in this callback,
@@ -141,6 +142,12 @@ export async function apply(ctx: Context, config: Config)
     colors: 3,
     record: (record: Logger.Record) =>
     {
+      // 确保每条日志都有唯一的 id
+      if (!record.id)
+      {
+        record.id = ++recordId;
+      }
+
       record.meta ||= {};
       const scope = record.meta[Context.current]?.scope;
       if (loader && scope)

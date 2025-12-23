@@ -39,10 +39,10 @@
               @touchstart.stop.passive="startResize($event, 'time')"></div>
           </div>
 
-          <div class="header-cell name-col p-0!">
-            <el-dropdown trigger="click" @command="handleLevelFilter" class="w-full h-full">
-              <div class="level-filter-trigger w-full h-full flex items-center px-12px">
-                来源 <el-icon class="el-icon--right">
+          <div class="header-cell content-col p-0!">
+            <el-dropdown trigger="click" @command="handleLevelFilter" class="level-dropdown">
+              <div class="level-filter-trigger flex items-center px-12px">
+                日志内容 <el-icon class="el-icon--right">
                   <ArrowDown />
                 </el-icon>
               </div>
@@ -57,12 +57,6 @@
                 </el-dropdown-menu>
               </template>
             </el-dropdown>
-            <div class="resizer" @click.stop @mousedown="startResize($event, 'name')"
-              @touchstart.stop.passive="startResize($event, 'name')"></div>
-          </div>
-
-          <div class="header-cell content-col">
-            <span>消息内容</span>
           </div>
         </div>
 
@@ -78,8 +72,7 @@
                     @click.stop />
                 </div>
                 <div class="log-cell time-col" v-html="renderTime(log)"></div>
-                <div class="log-cell name-col" v-html="renderName(log)"></div>
-                <div class="log-cell content-col" v-html="renderContent(log)"></div>
+                <div class="log-cell content-col" v-html="renderCombinedContent(log)"></div>
               </div>
             </template>
           </virtual-list>
@@ -115,7 +108,6 @@ const sortKey = ref<'time' | 'name' | null>(null);
 const sortOrder = ref<'asc' | 'desc'>('asc');
 const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 const timeWidth = ref(170);
-const nameWidth = ref(240);
 const checkboxWidth = ref(40);
 const showScrollToBottom = ref(false);
 const isNearBottom = ref(true);
@@ -127,7 +119,7 @@ const selectAll = ref(false);
 const tableMinWidth = computed(() =>
 {
   // 保证在移动端也有足够的横向滚动宽度
-  return (timeWidth.value + nameWidth.value + checkboxWidth.value + 400) + 'px';
+  return (timeWidth.value + checkboxWidth.value + 600) + 'px';
 });
 
 // --- 模板引用 ---
@@ -305,18 +297,17 @@ const toggleSort = (key: 'time' | 'name') =>
 };
 
 // --- 列宽调整逻辑 ---
-const startResize = (e: MouseEvent | TouchEvent, col: 'time' | 'name') =>
+const startResize = (e: MouseEvent | TouchEvent, col: 'time') =>
 {
   const startX = 'clientX' in e ? e.clientX : e.touches[0].clientX;
-  const startWidth = col === 'time' ? timeWidth.value : nameWidth.value;
+  const startWidth = timeWidth.value;
 
   const onMove = (moveEvent: MouseEvent | TouchEvent) =>
   {
     const currentX = 'clientX' in moveEvent ? moveEvent.clientX : moveEvent.touches[0].clientX;
     const diff = currentX - startX;
     const newWidth = Math.max(50, startWidth + diff);
-    if (col === 'time') timeWidth.value = newWidth;
-    else nameWidth.value = newWidth;
+    timeWidth.value = newWidth;
   };
 
   const onEnd = () =>
@@ -500,6 +491,25 @@ const renderContent = (record: Logger.Record) =>
   }
 
   return converter.ansi_to_html(content);
+};
+
+// 渲染合并的内容：来源 + 消息内容
+const renderCombinedContent = (record: Logger.Record) =>
+{
+  const prefix = `[${record.type[0].toUpperCase()}]`;
+  const code = Logger.code(record.name, { colors: 3 });
+  const label = renderColor(code, record.name, ';1');
+  const nameHtml = converter.ansi_to_html(`${prefix} ${label}`);
+
+  let content = record.content;
+  const isErrorLike = record.type !== 'info' && record.type !== 'success';
+  if (isErrorLike && content.includes(' at '))
+  {
+    content = formatStackTrace(content);
+  }
+  const contentHtml = converter.ansi_to_html(content);
+
+  return `${nameHtml} ${contentHtml}`;
 };
 
 // --- 复制事件处理 ---
@@ -693,23 +703,18 @@ const formatCopyText = (record: Logger.Record) =>
   color: var(--terminal-timestamp);
 }
 
-.name-col {
-  width: var(--name-width);
-  flex-shrink: 0;
-  padding-right: 8px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  font-weight: bold;
-  border-right: 1px solid var(--k-border-color);
-}
-
 .content-col {
   flex-grow: 1;
   padding-right: 12px;
   white-space: pre-wrap;
   word-break: break-all;
   min-width: 0;
+}
+
+.level-dropdown {
+  height: 100%;
+  display: flex;
+  align-items: center;
 }
 
 .log-cell :deep(*) {
