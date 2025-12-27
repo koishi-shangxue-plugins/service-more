@@ -1,12 +1,7 @@
 <template>
   <div class="log-container" ref="containerEl">
-    <!-- 顶部控制栏：仅显示复制按钮 -->
-    <div class="log-toolbar" v-if="selectedLogs.size > 0">
-      <el-button type="primary" :icon="CopyDocument" @click="copySelectedLogs" size="default"
-        class="action-btn copy-btn">
-        复制选中 ({{ selectedLogs.size }})
-      </el-button>
-    </div>
+    <!-- 搜索框（保留功能但隐藏，用户可用浏览器自带搜索） -->
+    <el-input v-model="searchQuery" v-show="false" />
 
     <!-- 滚动容器：支持横向滚动 -->
     <div class="log-scroll-container">
@@ -21,16 +16,29 @@
             <el-checkbox v-model="selectAll" @change="toggleSelectAll" :indeterminate="isIndeterminate" />
           </div>
 
-          <div class="header-cell time-col" @click="toggleSort('time')">
-            <span>时间</span>
-            <el-icon v-if="sortKey === 'time'" class="sort-icon">
-              <component :is="sortOrder === 'asc' ? CaretTop : CaretBottom" />
-            </el-icon>
+          <!-- 时间列：改为下拉框 -->
+          <div class="header-cell time-col p-0!">
+            <el-dropdown trigger="click" @command="handleTimeSort" class="time-dropdown">
+              <div class="time-filter-trigger flex items-center px-8px">
+                时间 <el-icon class="el-icon--right">
+                  <ArrowDown />
+                </el-icon>
+              </div>
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item command="asc"
+                    :class="{ 'is-active': sortKey === 'time' && sortOrder === 'asc' }">按时间顺序</el-dropdown-item>
+                  <el-dropdown-item command="desc"
+                    :class="{ 'is-active': sortKey === 'time' && sortOrder === 'desc' }">按时间逆序</el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
             <div class="resizer" @click.stop @mousedown="startResize($event, 'time')"
               @touchstart.stop.passive="startResize($event, 'time')"></div>
           </div>
 
-          <div class="header-cell content-col p-0!">
+          <!-- 日志内容列：添加复制按钮 -->
+          <div class="header-cell content-col p-0! flex items-center justify-between">
             <el-dropdown trigger="click" @command="handleLevelFilter" class="level-dropdown">
               <div class="level-filter-trigger flex items-center px-12px">
                 日志内容 <el-icon class="el-icon--right">
@@ -48,6 +56,12 @@
                 </el-dropdown-menu>
               </template>
             </el-dropdown>
+
+            <!-- 复制选中按钮 -->
+            <el-button v-if="selectedLogs.size > 0" type="primary" :icon="CopyDocument" @click="copySelectedLogs"
+              size="small" class="copy-btn ml-8px mr-12px">
+              复制选中 ({{ selectedLogs.size }})
+            </el-button>
           </div>
         </div>
 
@@ -71,18 +85,19 @@
       </div>
     </div>
 
-    <!-- 悬浮球：冻结日志按钮 -->
-    <transition name="fade">
+    <!-- 右下角悬浮按钮组 -->
+    <div class="floating-buttons">
+      <!-- 冻结日志按钮 -->
       <el-button :type="isPaused ? 'success' : 'warning'" :icon="isPaused ? VideoPlay : VideoPause" @click="togglePause"
-        circle class="floating-freeze-btn" :title="isPaused ? '恢复刷新' : '冻结日志'">
+        circle class="floating-btn" :title="isPaused ? '恢复刷新' : '冻结日志'">
       </el-button>
-    </transition>
 
-    <!-- 滚动到底部按钮 -->
-    <transition name="fade">
-      <el-button v-if="showScrollToBottom" class="scroll-to-bottom" type="primary" circle :icon="ArrowDown"
-        @click="scrollToBottom" />
-    </transition>
+      <!-- 滚动到底部按钮 -->
+      <transition name="fade">
+        <el-button v-if="showScrollToBottom" class="floating-btn" type="primary" circle :icon="ArrowDown"
+          @click="scrollToBottom" />
+      </transition>
+    </div>
   </div>
 </template>
 
@@ -98,11 +113,6 @@ const props = defineProps<{
   logs: Logger.Record[];
   showLink?: boolean;
 }>();
-
-// 暴露搜索框给父组件使用
-defineExpose({
-  searchQuery
-});
 
 // --- 状态变量 ---
 const searchQuery = ref('');
@@ -196,6 +206,13 @@ const sortedLogs = computed(() =>
   });
 });
 
+// --- 时间排序处理 ---
+const handleTimeSort = (command: 'asc' | 'desc') =>
+{
+  sortKey.value = 'time';
+  sortOrder.value = command;
+};
+
 // --- 日志级别筛选 ---
 const handleLevelFilter = (command: 'ALL' | 'I' | 'W' | 'E' | 'D') =>
 {
@@ -281,6 +298,11 @@ const copySelectedLogs = async () =>
   {
     await navigator.clipboard.writeText(textToCopy);
     message.success(`已复制 ${selectedLogRecords.length} 条日志`);
+
+    // 复制成功后清除选中状态
+    selectedLogs.value.clear();
+    selectedLogs.value = new Set(selectedLogs.value);
+    selectAll.value = false;
   } catch (error)
   {
     message.error('复制失败');
@@ -525,6 +547,11 @@ const formatCopyText = (record: Logger.Record) =>
   return `${time} ${prefix} ${record.name} ${cleanContent}`;
 };
 
+// 暴露搜索框给父组件使用
+defineExpose({
+  searchQuery
+});
+
 </script>
 
 <style lang="scss" scoped>
@@ -674,10 +701,12 @@ const formatCopyText = (record: Logger.Record) =>
 .log-item {
   display: flex;
   align-items: baseline;
-  line-height: 1.2;
-  /* 减小行高 */
-  padding: 1px 0;
-  /* 减小上下内边距 */
+  line-height: 1.3;
+  /* 行内行高 */
+  padding: 0;
+  /* 移除内边距，通过margin控制日志间距 */
+  margin-bottom: 0;
+  /* 不同日志之间无额外间距 */
   border-bottom: 1px solid transparent;
   font-size: 0.85em;
   /* 整体日志内容缩小至 85% */
@@ -706,22 +735,70 @@ const formatCopyText = (record: Logger.Record) =>
   min-width: 0;
 }
 
-.level-dropdown {
+.level-dropdown,
+.time-dropdown {
   height: 100%;
   display: flex;
   align-items: center;
+}
+
+.time-filter-trigger {
+  cursor: pointer;
+  user-select: none;
+  transition: color 0.2s;
+
+  &:hover {
+    color: var(--k-primary);
+  }
+}
+
+.copy-btn {
+  flex-shrink: 0;
 }
 
 .log-cell :deep(*) {
   font-family: inherit;
 }
 
-/* 悬浮球：冻结日志按钮 */
-.floating-freeze-btn {
+/* 右下角悬浮按钮组 */
+.floating-buttons {
   position: absolute;
   right: 20px;
-  top: 20px;
+  bottom: 20px;
   z-index: 100;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  /* 按钮居中对齐 */
+  gap: 16px;
+  /* 按钮之间的间距 */
+}
+
+/* 悬浮按钮通用样式 */
+.floating-btn {
+  width: 56px !important;
+  /* 加大一倍：默认32px -> 56px */
+  height: 56px !important;
+  min-width: 56px !important;
+  max-width: 56px !important;
+  /* 严格限制宽度 */
+  min-height: 56px !important;
+  max-height: 56px !important;
+  /* 严格限制高度 */
+  padding: 0 !important;
+  /* 移除内边距 */
+  margin: 0 !important;
+  /* 移除外边距 */
+  border-radius: 50% !important;
+  /* 确保圆形 */
+  font-size: 24px !important;
+  /* 图标大小 */
+  line-height: 1 !important;
+  /* 行高 */
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  /* 内容居中 */
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
   transition: all 0.3s ease;
 
@@ -729,13 +806,12 @@ const formatCopyText = (record: Logger.Record) =>
     transform: scale(1.1);
     box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
   }
-}
 
-.scroll-to-bottom {
-  position: absolute;
-  right: 20px;
-  bottom: 20px;
-  z-index: 10;
+  /* 覆盖Element Plus的图标样式 */
+  :deep(.el-icon) {
+    font-size: 24px !important;
+    margin: 0 !important;
+  }
 }
 
 .fade-enter-active,
@@ -764,9 +840,9 @@ const formatCopyText = (record: Logger.Record) =>
     right: -8px;
   }
 
-  .floating-freeze-btn {
+  .floating-buttons {
     right: 12px;
-    top: 12px;
+    bottom: 12px;
   }
 }
 </style>

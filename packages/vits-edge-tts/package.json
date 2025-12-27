@@ -1,0 +1,43 @@
+{
+  "name": "koishi-plugin-vits-edge-tts",
+  "description": "",
+  "version": "0.1.2",
+  "main": "lib/index.js",
+  "typings": "lib/index.d.ts",
+  "files": [
+    "lib",
+    "src"
+  ],
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/koishi-shangxue-plugins/service-more.git"
+  },
+  "bugs": {
+    "url": "https://github.com/koishi-shangxue-plugins/service-more/issues"
+  },
+  "homepage": "https://github.com/koishi-shangxue-plugins/service-more",
+  "keywords": [
+    "bot",
+    "chatbot",
+    "koishi",
+    "plugin",
+    "vits",
+    "client"
+  ],
+  "koishi": {
+    "category": "storage",
+    "description": {
+      "en": "",
+      "zh": ""
+    },
+    "service": {
+      "implements": [
+        "vits"
+      ]
+    }
+  },
+  "peerDependencies": {
+    "koishi": "^4.17.1"
+  }
+}
