@@ -1,19 +1,11 @@
 <template>
   <div class="log-container" ref="containerEl">
-    <!-- 顶部控制栏：搜索框和复制按钮 -->
-    <div class="log-toolbar">
-      <div class="toolbar-left">
-        <el-button :type="isPaused ? 'success' : 'warning'" :icon="isPaused ? VideoPlay : VideoPause"
-          @click="togglePause" size="default" class="action-btn freeze-btn">
-          {{ isPaused ? '恢复刷新' : '冻结日志' }}
-        </el-button>
-        <el-button v-if="selectedLogs.size > 0" type="primary" :icon="CopyDocument" @click="copySelectedLogs"
-          size="default" class="action-btn copy-btn">
-          复制选中 ({{ selectedLogs.size }})
-        </el-button>
-      </div>
-      <el-input v-model="searchQuery" placeholder="搜索日志内容或来源..." clearable size="default" :prefix-icon="Search"
-        class="search-input" />
+    <!-- 顶部控制栏：仅显示复制按钮 -->
+    <div class="log-toolbar" v-if="selectedLogs.size > 0">
+      <el-button type="primary" :icon="CopyDocument" @click="copySelectedLogs" size="default"
+        class="action-btn copy-btn">
+        复制选中 ({{ selectedLogs.size }})
+      </el-button>
     </div>
 
     <!-- 滚动容器：支持横向滚动 -->
@@ -79,6 +71,13 @@
       </div>
     </div>
 
+    <!-- 悬浮球：冻结日志按钮 -->
+    <transition name="fade">
+      <el-button :type="isPaused ? 'success' : 'warning'" :icon="isPaused ? VideoPlay : VideoPause" @click="togglePause"
+        circle class="floating-freeze-btn" :title="isPaused ? '恢复刷新' : '冻结日志'">
+      </el-button>
+    </transition>
+
     <!-- 滚动到底部按钮 -->
     <transition name="fade">
       <el-button v-if="showScrollToBottom" class="scroll-to-bottom" type="primary" circle :icon="ArrowDown"
@@ -97,7 +96,13 @@ import { Search, ArrowDown, CaretTop, CaretBottom, VideoPause, VideoPlay, CopyDo
 
 const props = defineProps<{
   logs: Logger.Record[];
+  showLink?: boolean;
 }>();
+
+// 暴露搜索框给父组件使用
+defineExpose({
+  searchQuery
+});
 
 // --- 状态变量 ---
 const searchQuery = ref('');
@@ -545,26 +550,16 @@ const formatCopyText = (record: Logger.Record) =>
 }
 
 .log-toolbar {
-  padding: 12px 16px;
+  padding: 8px 16px;
   background-color: var(--k-card-bg);
   border-bottom: 1px solid var(--k-border-color);
   flex-shrink: 0;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 16px;
+  justify-content: flex-end;
+  gap: 8px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   z-index: 20;
-
-  .toolbar-left {
-    display: flex;
-    gap: 8px;
-  }
-
-  .search-input {
-    max-width: 400px;
-    flex: 1;
-  }
 
   .action-btn {
     transition: all 0.3s ease;
@@ -679,8 +674,10 @@ const formatCopyText = (record: Logger.Record) =>
 .log-item {
   display: flex;
   align-items: baseline;
-  line-height: 1.3;
-  padding: 2px 0;
+  line-height: 1.2;
+  /* 减小行高 */
+  padding: 1px 0;
+  /* 减小上下内边距 */
   border-bottom: 1px solid transparent;
   font-size: 0.85em;
   /* 整体日志内容缩小至 85% */
@@ -719,6 +716,21 @@ const formatCopyText = (record: Logger.Record) =>
   font-family: inherit;
 }
 
+/* 悬浮球：冻结日志按钮 */
+.floating-freeze-btn {
+  position: absolute;
+  right: 20px;
+  top: 20px;
+  z-index: 100;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  transition: all 0.3s ease;
+
+  &:hover {
+    transform: scale(1.1);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+  }
+}
+
 .scroll-to-bottom {
   position: absolute;
   right: 20px;
@@ -743,24 +755,18 @@ const formatCopyText = (record: Logger.Record) =>
 
 @media (max-width: 768px) {
   .log-toolbar {
-    padding: 8px;
-    flex-direction: column;
-    align-items: stretch;
-    gap: 8px;
-
-    .toolbar-left {
-      justify-content: space-between;
-    }
-
-    .search-input {
-      max-width: none;
-    }
+    padding: 6px 8px;
   }
 
   .resizer {
     width: 16px;
     /* 手机端加大触摸区域 */
     right: -8px;
+  }
+
+  .floating-freeze-btn {
+    right: 12px;
+    top: 12px;
   }
 }
 </style>
