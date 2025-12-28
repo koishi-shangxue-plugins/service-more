@@ -1,12 +1,13 @@
 {
   "name": "koishi-plugin-vits-edge-tts",
-  "description": "",
-  "version": "0.1.2",
+  "description": "基于 Microsoft Edge TTS 的 Koishi VITS 语音合成服务",
+  "version": "0.1.0",
   "main": "lib/index.js",
   "typings": "lib/index.d.ts",
   "files": [
     "lib",
-    "src"
+    "src",
+    "data"
   ],
   "license": "MIT",
   "repository": {
@@ -28,8 +29,8 @@
   "koishi": {
     "category": "storage",
     "description": {
-      "en": "",
-      "zh": ""
+      "en": "VITS voice synthesis service based on Microsoft Edge TTS",
+      "zh": "基于 Microsoft Edge TTS 的 VITS 语音合成服务"
     },
     "service": {
       "implements": [
@@ -39,5 +40,11 @@
   },
   "peerDependencies": {
     "koishi": "^4.17.1"
+  },
+  "dependencies": {
+    "@gradio/client": "^1.8.2"
+  },
+  "devDependencies": {
+    "@initencounter/vits": "^0.0.3"
   }
 }
