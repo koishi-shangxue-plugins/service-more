@@ -1,7 +1,7 @@
 {
   "name": "koishi-plugin-vits-edge-tts",
   "description": "基于 Microsoft Edge TTS 的 Koishi VITS 语音合成服务",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "main": "lib/index.js",
   "typings": "lib/index.d.ts",
   "files": [
