@@ -1,5 +1,13 @@
 import { Context, Schema } from 'koishi';
 import type { } from 'koishi-plugin-downloads';
+
+declare module 'koishi' {
+  interface Context
+  {
+    downloads: any;
+  }
+}
+
 import { access, constants, readdir, stat } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { resolve, delimiter } from 'node:path';

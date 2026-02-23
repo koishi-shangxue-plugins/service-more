@@ -2,7 +2,7 @@
 
 [![npm](https://img.shields.io/npm/v/koishi-plugin-ffmpeg-path?style=flat-square)](https://www.npmjs.com/package/koishi-plugin-ffmpeg-path)
 
-### Termux 环境配置
+## Termux 环境配置
 
 由于 Termux 的特殊文件系统结构，您需要手动指定 FFmpeg 的路径。请按照以下步骤操作：
 
