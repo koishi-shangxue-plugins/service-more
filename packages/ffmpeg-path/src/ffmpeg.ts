@@ -19,7 +19,7 @@ interface RunReturn
 
 export class FFmpegBuilder
 {
-  _input: string | Buffer | Readable;
+  _inputs: Array<string | Buffer | Readable> = [];
   inputOptions: string[] = [];
   outputOptions: string[] = [];
   constructor(public executable: string) { }
@@ -29,7 +29,7 @@ export class FFmpegBuilder
   input(stream: Readable): FFmpegBuilder;
   input(arg: string | Buffer | Readable): FFmpegBuilder
   {
-    this._input = arg;
+    this._inputs.push(arg);
     return this;
   }
 
@@ -47,14 +47,14 @@ export class FFmpegBuilder
 
   run<T extends keyof RunReturn>(type: T, path?: string): RunReturn[T]
   {
-    const options: string[] = ['-y'];
-    if (typeof this._input === 'string')
+    const options: string[] = ['-y', ...this.inputOptions];
+    const hasNonStringInput = this._inputs.some(i => typeof i !== 'string');
+
+    for (const input of this._inputs)
     {
-      options.push(...[...this.inputOptions, '-i', this._input]);
-    } else
-    {
-      options.push(...[...this.inputOptions, '-i', '-']);
+      options.push('-i', typeof input === 'string' ? input : '-');
     }
+
     if (type === 'file')
     {
       options.push(...[...this.outputOptions, path]);
@@ -63,13 +63,18 @@ export class FFmpegBuilder
       options.push(...[...this.outputOptions, '-']);
     }
     const child = spawn(this.executable, options, { stdio: 'pipe' });
-    if (this._input instanceof Buffer)
+
+    if (hasNonStringInput)
     {
-      child.stdin.write(this._input);
-      child.stdin.end();
-    } else if (this._input instanceof Readable)
-    {
-      this._input.pipe(child.stdin);
+      const firstNonString = this._inputs.find(i => typeof i !== 'string');
+      if (firstNonString instanceof Buffer)
+      {
+        child.stdin.write(firstNonString);
+        child.stdin.end();
+      } else if (firstNonString instanceof Readable)
+      {
+        firstNonString.pipe(child.stdin);
+      }
     }
     if (type === 'stream')
     {
