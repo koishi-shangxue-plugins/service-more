@@ -182,6 +182,15 @@ export async function apply(ctx: Context, config: Config)
         break; // 退出循环
       }
 
+      // 2.5. 尝试 Termux 默认路径
+      const termuxPath = '/data/data/com.termux/files/usr/bin/ffmpeg';
+      if (await checkPath(termuxPath))
+      {
+        executable = termuxPath;
+        ctx.logger.info(`在 Termux 默认路径找到 FFmpeg: ${executable}`);
+        break;
+      }
+
       // 3. 尝试查找 downloads 目录下的 ffmpeg
       const downloadsDirExecutable = await tryFindDownloadsDir();
       if (downloadsDirExecutable)
