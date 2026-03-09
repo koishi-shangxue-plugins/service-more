@@ -1,6 +1,6 @@
 {
   "name": "koishi-plugin-ffmpeg-path",
-  "version": "1.2.1",
+  "version": "1.3.0",
   "description": "允许指定 FFmpeg 可执行文件路径，或自动下载 FFmpeg。",
   "main": "lib/index.js",
   "typings": "lib/index.d.ts",
@@ -26,27 +26,25 @@
     "termux"
   ],
   "dependencies": {
-    "get-registry": "^1.1.0"
+    "get-registry": "^1.1.0",
+    "nereid": "^0.0.5",
+    "@shopify/semaphore": "^3.1.0",
+    "silk-wasm": "^3.7.1"
   },
   "peerDependencies": {
     "koishi": "^4.15.5"
   },
-  "devDependencies": {
-    "koishi-plugin-downloads": "^0.1.3"
-  },
   "koishi": {
     "description": {
-      "zh": "允许指定 FFmpeg 可执行文件路径。可自动查找 或 下载 FFmpeg。"
+      "zh": "允许指定 FFmpeg 可执行文件路径。可自动查找 或 下载 FFmpeg。可选启用 SILK 音频编码服务。"
     },
     "service": {
       "required": [
         "logger"
       ],
-      "optional": [
-        "downloads"
-      ],
       "implements": [
-        "ffmpeg"
+        "ffmpeg",
+        "silk"
       ]
     }
   }
