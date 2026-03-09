@@ -95,7 +95,7 @@ export const Config: Schema<Config> = Schema.intersect([
     Schema.object({ autoDetect: Schema.const(true) }),
     Schema.object({
       autoDetect: Schema.const(false).required(),
-      path: Schema.string().description('手动指定 ffmpeg 可执行文件的绝对路径'),
+      path: Schema.string().role('textarea', { rows: [2, 4] }).description('手动指定 ffmpeg 可执行文件的绝对路径'),
     }),
   ]),
 
@@ -133,10 +133,11 @@ export async function apply(ctx: Context, config: Config)
       for (const name of executableNames)
       {
         const fullPath = resolve(dir, name);
-        if (await checkPath(fullPath))
+        const checkedPath = await checkPath(fullPath);
+        if (checkedPath)
         {
-          logInfo(`在环境变量中找到 ffmpeg: ${fullPath}`);
-          return fullPath;
+          logInfo(`在环境变量中找到 ffmpeg: ${checkedPath}`);
+          return checkedPath;
         }
       }
     }
@@ -151,12 +152,16 @@ export async function apply(ctx: Context, config: Config)
     logInfo(config);
 
     // 1. 检查用户指定的 path
-    if (config.path && await checkPath(config.path))
+    if (config.path)
     {
-      executable = config.path;
-      ctx.logger.info(`使用用户指定的 FFmpeg 路径: ${executable}`);
-      startServices();
-      return;
+      const userPath = await checkPath(config.path);
+      if (userPath)
+      {
+        executable = userPath;
+        ctx.logger.info(`使用用户指定的 FFmpeg 路径: ${executable}`);
+        startServices();
+        return;
+      }
     }
 
     // 2. 在环境变量中查找 ffmpeg
@@ -170,8 +175,8 @@ export async function apply(ctx: Context, config: Config)
     }
 
     // 3. 尝试 Termux 默认路径
-    const termuxPath = '/data/data/com.termux/files/usr/bin/ffmpeg';
-    if (await checkPath(termuxPath))
+    const termuxPath = await checkPath('/data/data/com.termux/files/usr/bin/ffmpeg');
+    if (termuxPath)
     {
       executable = termuxPath;
       ctx.logger.info(`在 Termux 默认路径找到 FFmpeg: ${executable}`);
@@ -213,25 +218,49 @@ export async function apply(ctx: Context, config: Config)
     }
   }
 
-  // 检查指定的 path 是否可用
-  async function checkPath(path: string): Promise<boolean>
+  // 检查指定的 path 是否可用（支持文件或文件夹，绝对或相对路径）
+  async function checkPath(path: string): Promise<string | null>
   {
-    if (!path || !existsSync(path))
+    if (!path) return null;
+
+    // 解析为绝对路径
+    const absolutePath = resolve(ctx.baseDir, path);
+
+    if (!existsSync(absolutePath))
     {
-      return false;
+      return null;
     }
+
     try
     {
-      const stats = await stat(path);
-      if (!stats.isFile())
+      const stats = await stat(absolutePath);
+
+      // 如果是文件，检查是否可执行
+      if (stats.isFile())
       {
-        return false;
+        await access(absolutePath, constants.F_OK | constants.X_OK);
+        return absolutePath;
       }
-      await access(path, constants.F_OK | constants.X_OK);
-      return true;
+
+      // 如果是文件夹，查找 ffmpeg 可执行文件
+      if (stats.isDirectory())
+      {
+        const ffmpegPath = resolve(absolutePath, platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg');
+        if (existsSync(ffmpegPath))
+        {
+          const ffmpegStats = await stat(ffmpegPath);
+          if (ffmpegStats.isFile())
+          {
+            await access(ffmpegPath, constants.F_OK | constants.X_OK);
+            return ffmpegPath;
+          }
+        }
+      }
+
+      return null;
     } catch (error)
     {
-      return false;
+      return null;
     }
   }
 
@@ -253,9 +282,10 @@ export async function apply(ctx: Context, config: Config)
         if (stats.isDirectory())
         {
           const ffmpegPath = resolve(fullPath, platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg');
-          if (await checkPath(ffmpegPath))
+          const checkedPath = await checkPath(ffmpegPath);
+          if (checkedPath)
           {
-            return ffmpegPath;
+            return checkedPath;
           }
         }
       }
