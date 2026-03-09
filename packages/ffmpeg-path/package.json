@@ -1,6 +1,6 @@
 {
   "name": "koishi-plugin-ffmpeg-path",
-  "version": "1.3.0",
+  "version": "2.0.0",
   "description": "允许指定 FFmpeg 可执行文件路径，或自动下载 FFmpeg。",
   "main": "lib/index.js",
   "typings": "lib/index.d.ts",
@@ -26,9 +26,9 @@
     "termux"
   ],
   "dependencies": {
+    "@shopify/semaphore": "^3.1.0",
     "get-registry": "^1.1.0",
     "nereid": "^0.0.5",
-    "@shopify/semaphore": "^3.1.0",
     "silk-wasm": "^3.7.1"
   },
   "peerDependencies": {

@@ -294,36 +294,41 @@ export async function apply(ctx: Context, config: Config)
     }
   }
 
-  // 尝试查找 downloads 目录下的 ffmpeg
+  // 尝试查找目录下的 ffmpeg
   async function tryFindDownloadsDir(): Promise<string | null>
   {
-    if (!existsSync(downloadPath))
-    {
-      return null;
-    }
+    const dirsToCheck = [
+      './downloads',  // downloads 插件使用的目录
+      downloadPath,  // data/ffmpeg-path/ffmpeg
+    ];
 
-    try
+    for (const dir of dirsToCheck)
     {
-      const files = await readdir(downloadPath);
-      for (const file of files)
+      if (!existsSync(dir)) continue;
+
+      try
       {
-        const fullPath = resolve(downloadPath, file);
-        const stats = await stat(fullPath);
-        if (stats.isDirectory())
+        const files = await readdir(dir);
+        for (const file of files)
         {
-          const ffmpegPath = resolve(fullPath, platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg');
-          const checkedPath = await checkPath(ffmpegPath);
-          if (checkedPath)
+          const fullPath = resolve(dir, file);
+          const stats = await stat(fullPath);
+          if (stats.isDirectory())
           {
-            return checkedPath;
+            const ffmpegPath = resolve(fullPath, platform === 'win32' ? 'ffmpeg.exe' : 'ffmpeg');
+            const checkedPath = await checkPath(ffmpegPath);
+            if (checkedPath)
+            {
+              return checkedPath;
+            }
           }
         }
+      } catch (error)
+      {
+        ctx.logger.warn(`查找 ${dir} 目录下的 FFmpeg 失败: `, error);
       }
-    } catch (error)
-    {
-      ctx.logger.warn('查找 downloads 目录下的 FFmpeg 失败: ', error);
-      return null;
     }
+
     return null;
   }
 
