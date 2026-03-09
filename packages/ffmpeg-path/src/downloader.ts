@@ -1,5 +1,6 @@
 import { Context } from 'koishi';
 import { ResolveOptions, sync, State } from 'nereid';
+import { pathToFileURL } from 'node:url';
 
 // 下载任务类
 export class DownloadTask
@@ -37,11 +38,6 @@ export class DownloadTask
       this.ctx.logger.info('FFmpeg 开始下载');
     });
 
-    state.on('download/done', () =>
-    {
-      this.ctx.logger.info('FFmpeg 下载完成');
-    });
-
     state.on('download/failed', (error) =>
     {
       this.ctx.logger.error('下载失败:', error.message);
@@ -49,7 +45,7 @@ export class DownloadTask
 
     state.on('done', (path) =>
     {
-      this.ctx.logger.success('FFmpeg 下载成功');
+      this.ctx.logger.success(`FFmpeg 下载成功: ${pathToFileURL(path).href}`);
       this.resolve(path);
     });
 

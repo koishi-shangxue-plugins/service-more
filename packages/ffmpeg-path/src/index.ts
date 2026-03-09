@@ -1,7 +1,8 @@
 import { Context, Schema } from 'koishi';
 import { access, constants, readdir, stat, mkdir } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
-import { resolve, delimiter } from 'node:path';
+import { resolve, delimiter, relative } from 'node:path';
+import { pathToFileURL, fileURLToPath } from 'node:url';
 import * as os from 'node:os';
 import { FFmpeg } from './ffmpeg';
 import { DownloadTask } from './downloader';
@@ -28,6 +29,8 @@ export const inject = {
 };
 
 export const usage = `
+---
+
 <details>
 <summary>Termux 相关 -- 环境配置</summary>
 
@@ -55,23 +58,35 @@ export const usage = `
 
 </details>
 
+---
+
 ### 其他平台
 
-对于其他平台（Windows、macOS、Linux），支持自动检测环境变量和自动下载。
+对于其他平台（Windows、macOS、Linux），支持自动检测环境变量和自动下载（无需额外安装 downloads 插件）。
 
-如果您希望使用特定版本的 FFmpeg，您仍然可以通过 \`path\` 选项 手动指定其绝对路径。
+如果您希望使用特定版本的 FFmpeg，您可以通过 \`path\` 选项手动指定路径，支持：
+- 文件的绝对路径或相对路径
+- 文件夹的绝对路径或相对路径（自动查找 ffmpeg 可执行文件）
+- file:// URL 格式（可从浏览器地址栏复制）
+
+---
 
 ### 自动检测 & 自动下载
 
-如果您已经安装了 FFmpeg，并且配置好了环境变量，本插件会自动识别 可执行文件的路径 并使用。
+如果您已经安装了 FFmpeg，并且配置好了环境变量，本插件会自动识别可执行文件的路径并使用。
 
-如果您没有安装 FFmpeg，插件会自动下载 FFmpeg 到 \`downloads\` 目录。
+如果您没有安装 FFmpeg，插件会自动下载 FFmpeg 到 \`./data/ffmpeg-path/ffmpeg\` 目录。
 
 但是，请注意：
 
 *   自动下载的 FFmpeg 可能不是最新版本。
 *   在某些环境中，自动下载可能会失败。
-*   自动下载的ffmpeg将会存放在项目目录下的\`downloads\`文件夹中
+
+---
+
+### SILK 音频编码服务
+
+启用 \`enableSilk\` 配置项后，插件会提供 SILK 音频编码服务，用于 QQ 官方平台的语音消息发送，无需额外安装 silk 插件。
 
 ---
 `;
@@ -158,7 +173,7 @@ export async function apply(ctx: Context, config: Config)
       if (userPath)
       {
         executable = userPath;
-        ctx.logger.info(`使用用户指定的 FFmpeg 路径: ${executable}`);
+        ctx.logger.info(`使用用户指定的 FFmpeg 路径: ${pathToFileURL(executable).href}`);
         startServices();
         return;
       }
@@ -169,7 +184,7 @@ export async function apply(ctx: Context, config: Config)
     if (systemPathExecutable)
     {
       executable = systemPathExecutable;
-      ctx.logger.info(`在环境变量中找到 FFmpeg: ${executable}`);
+      ctx.logger.info(`在环境变量中找到 FFmpeg: ${pathToFileURL(executable).href}`);
       startServices();
       return;
     }
@@ -179,17 +194,19 @@ export async function apply(ctx: Context, config: Config)
     if (termuxPath)
     {
       executable = termuxPath;
-      ctx.logger.info(`在 Termux 默认路径找到 FFmpeg: ${executable}`);
+      ctx.logger.info(`在 Termux 默认路径找到 FFmpeg: ${pathToFileURL(executable).href}`);
       startServices();
       return;
     }
 
-    // 4. 尝试查找 downloads 目录下的 ffmpeg
+    // 4. 尝试查找下载目录下的 ffmpeg
     const downloadsDirExecutable = await tryFindDownloadsDir();
     if (downloadsDirExecutable)
     {
       executable = downloadsDirExecutable;
-      ctx.logger.info(`使用 downloads 目录下的 FFmpeg 文件。`);
+      const relativeDir = relative(ctx.baseDir, downloadPath).replace(/\\/g, '/');
+      const relativeFile = relative(ctx.baseDir, executable).replace(/\\/g, '/');
+      ctx.logger.info(`使用 ./${relativeDir} 目录下的 FFmpeg 文件: ./${relativeFile}`);
       startServices();
       return;
     }
@@ -201,7 +218,6 @@ export async function apply(ctx: Context, config: Config)
       if (downloadedExecutable)
       {
         executable = downloadedExecutable;
-        ctx.logger.success(`FFmpeg 下载成功: ${executable}`);
         startServices();
         return;
       }
@@ -218,13 +234,27 @@ export async function apply(ctx: Context, config: Config)
     }
   }
 
-  // 检查指定的 path 是否可用（支持文件或文件夹，绝对或相对路径）
+  // 检查指定的 path 是否可用（支持文件或文件夹，绝对或相对路径，以及 file:// URL）
   async function checkPath(path: string): Promise<string | null>
   {
     if (!path) return null;
 
+    // 如果是 file:// URL，转换为普通路径
+    let normalPath = path;
+    if (path.startsWith('file:///') || path.startsWith('file://'))
+    {
+      try
+      {
+        normalPath = fileURLToPath(path);
+      } catch (error)
+      {
+        ctx.logger.warn(`无法解析 file:// URL: ${path}`);
+        return null;
+      }
+    }
+
     // 解析为绝对路径
-    const absolutePath = resolve(ctx.baseDir, path);
+    const absolutePath = resolve(ctx.baseDir, normalPath);
 
     if (!existsSync(absolutePath))
     {
