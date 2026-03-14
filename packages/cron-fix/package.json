@@ -17,6 +17,17 @@
     "plugin",
     "cron-fix"
   ],
+  "koishi": {
+    "description": {
+      "en": "Scheduled Task Service",
+      "zh": "计划任务服务"
+    },
+    "service": {
+      "implements": [
+        "cron"
+      ]
+    }
+  },
   "homepage": "https://github.com/koishi-shangxue-plugins/koishi-shangxue-apps",
   "bugs": {
     "url": "https://github.com/koishi-shangxue-plugins/koishi-shangxue-apps/issues"

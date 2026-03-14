@@ -57,8 +57,7 @@ function formatLogValue(value: unknown)
 export function apply(ctx: Context, config: Config)
 {
   const pendingTasks = new Set<PendingTask>();
-  const currentCron = typeof ctx.cron === 'function' ? ctx.cron : null;
-  let targetCron: Cron | null = currentCron;
+  let targetCron: Cron | null = null;
   let missingCronWarned = false;
 
   function debugLog(...args: unknown[])
@@ -103,33 +102,11 @@ export function apply(ctx: Context, config: Config)
     }
   }
 
-  function syncTargetCron()
-  {
-    const detectedCron = typeof ctx.cron === 'function' && ctx.cron !== cronProxy
-      ? ctx.cron
-      : null;
-
-    if (!detectedCron)
-    {
-      return false;
-    }
-
-    if (detectedCron === targetCron)
-    {
-      return true;
-    }
-
-    targetCron = detectedCron;
-    debugLog('已检测到原始 cron 服务实现，开始转发调用。');
-    flushPendingTasks();
-    return true;
-  }
-
   function cronProxy(this: Context, input: string, callback: CronCallback)
   {
     const caller = this ?? ctx;
 
-    if (syncTargetCron() && targetCron)
+    if (targetCron)
     {
       return targetCron.call(caller, input, callback);
     }
@@ -157,19 +134,23 @@ export function apply(ctx: Context, config: Config)
   ctx.set('cron', cronProxy);
   debugLog('已注册 cron 代理服务。');
 
-  if (targetCron)
+  // 通过依赖注入等待真实 cron 服务，避免直接访问未注册属性。
+  ctx.inject(['cron'], (injectCtx) =>
   {
-    debugLog('检测到已有 cron 实现，代理服务会直接转发。');
-  }
-
-  ctx.on('ready', () =>
-  {
-    if (syncTargetCron())
+    const detectedCron = injectCtx.cron as Cron;
+    if (detectedCron === cronProxy || detectedCron === targetCron)
     {
       return;
     }
 
-    if (!missingCronWarned)
+    targetCron = detectedCron;
+    debugLog('已检测到原始 cron 服务实现，开始转发调用。');
+    flushPendingTasks();
+  });
+
+  ctx.on('ready', () =>
+  {
+    if (!targetCron && !missingCronWarned)
     {
       missingCronWarned = true;
       warnLog('未检测到原始 cron 插件实现，cron-fix 仅完成了服务占位。');
