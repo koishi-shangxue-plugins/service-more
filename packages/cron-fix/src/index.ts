@@ -43,6 +43,19 @@ function formatLogValue(value: unknown)
   }
 }
 
+function attachServiceOwner<T extends object>(value: T, owner: Context)
+{
+  if (!Reflect.getOwnPropertyDescriptor(value, Context.current))
+  {
+    Object.defineProperty(value, Context.current, {
+      value: owner,
+      configurable: true,
+    });
+  }
+
+  return value;
+}
+
 class CronTask
 {
   private timer?: Disposable;
@@ -122,6 +135,7 @@ export function apply(ctx: Context)
     });
   }
 
+  attachServiceOwner(cronProxy, ctx);
   ctx.set('cron', cronProxy);
   logInfo('已注册独立 cron 服务。');
 }
