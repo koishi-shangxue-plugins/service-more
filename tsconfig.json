@@ -8,4 +8,9 @@
       "koishi-plugin-glyph": [ "packages/glyph/src" ],
     },
   },
+  "exclude": [
+    "**/lib",
+    "**/dist",
+    "**/node_modules"
+  ]
 }
