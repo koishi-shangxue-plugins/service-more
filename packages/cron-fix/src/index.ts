@@ -5,6 +5,8 @@ export const name = 'cron-fix';
 export const inject = {
   implements: ['cron'] as const,
 };
+export const reusable = false;
+export const filter = false;
 
 export type CronCallback = () => void | Promise<void>;
 
@@ -17,10 +19,9 @@ declare module 'koishi' {
   }
 }
 
-export interface Config
-{ }
+export interface Config { }
 
-export const Config: Schema<Config> = Schema.object({}).description('基础设置');
+export const Config: Schema<Config> = Schema.object({});
 
 function formatLogValue(value: unknown)
 {
@@ -72,7 +73,6 @@ class CronTask
     this.scheduleNext();
   }
 
-  // 按 cron 表达式持续调度下一次执行。
   private scheduleNext()
   {
     if (this.disposed) return;
@@ -92,8 +92,6 @@ class CronTask
         this.logInfo('计划任务执行失败：', this.input, error);
       }
     }, delay);
-
-    this.logInfo('已调度下一次计划任务：', this.input, `${delay}ms`);
   }
 
   dispose()
@@ -102,7 +100,6 @@ class CronTask
     this.disposed = true;
     this.timer?.();
     this.timer = undefined;
-    this.logInfo('已释放计划任务：', this.input);
   }
 }
 
@@ -119,7 +116,6 @@ export function apply(ctx: Context)
   {
     const caller = this ?? ctx;
 
-    // 在创建阶段直接校验表达式，避免把错误延迟到运行期。
     const task = new CronTask(
       caller,
       input,
@@ -128,8 +124,7 @@ export function apply(ctx: Context)
       logInfo,
     );
 
-    logInfo('已创建计划任务：', input);
-    return caller.collect('cron', () =>
+    return caller.effect(() => () =>
     {
       task.dispose();
     });
@@ -137,5 +132,4 @@ export function apply(ctx: Context)
 
   attachServiceOwner(cronProxy, ctx);
   ctx.set('cron', cronProxy);
-  logInfo('已注册独立 cron 服务。');
 }
