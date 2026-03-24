@@ -3,6 +3,8 @@ import { Level, ChainedBatch } from 'level';
 import { resolve } from 'node:path';
 import { AbstractLevel } from 'abstract-level';
 
+const DATABASE_PATH = 'data/database/leveldb';
+
 // 获取对象的嵌套属性值
 function get(obj: any, path: string)
 {
@@ -79,7 +81,7 @@ class LevelDBDriver extends Driver
   {
     super(ctx, config);
     this.logger = ctx.logger(LevelDBDriver.name);
-    this._path = resolve(ctx.baseDir, config.path);
+    this._path = resolve(ctx.baseDir, DATABASE_PATH);
   }
 
   async start()
@@ -486,14 +488,11 @@ namespace LevelDBDriver
 {
   export interface Config
   {
-    path: string;
+    debug: boolean;
   }
 
   export const Config: Schema<Config> = Schema.object({
-    path: Schema.path({
-      filters: ['directory'],
-      allowCreate: true,
-    }).description('数据库目录的文件夹路径。').default('data/database/leveldb'),
+    debug: Schema.boolean().description('是否输出调试日志。').default(false),
   });
 }
 

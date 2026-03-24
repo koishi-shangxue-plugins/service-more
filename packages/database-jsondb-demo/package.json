@@ -1,0 +1,22 @@
+{
+  "name": "koishi-plugin-database-jsondb-demo",
+  "description": "demo plugin for testing jsondb table sharding",
+  "version": "0.0.0",
+  "main": "lib/index.js",
+  "typings": "lib/index.d.ts",
+  "files": [
+    "lib",
+    "src"
+  ],
+  "license": "MIT",
+  "peerDependencies": {
+    "koishi": "^4.17.1"
+  },
+  "koishi": {
+    "category": "storage",
+    "description": {
+      "en": "Demo plugin for testing jsondb sharding",
+      "zh": "用于测试 jsondb 分表分片的示例插件"
+    }
+  }
+}

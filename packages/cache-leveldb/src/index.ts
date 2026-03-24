@@ -3,6 +3,8 @@ import { Level } from 'level';
 import { resolve } from 'node:path';
 import { AbstractLevel } from 'abstract-level';
 
+const CACHE_PATH = 'data/cache/leveldb';
+
 // Koishi 模块声明，为 Context 添加 cache 属性
 declare module 'koishi' {
   interface Context
@@ -57,7 +59,7 @@ class LevelDBCache extends Cache
   constructor(protected ctx: Context, public config: LevelDBCache.Config)
   {
     super(ctx);
-    this._path = resolve(ctx.baseDir, config.path);
+    this._path = resolve(ctx.baseDir, CACHE_PATH);
 
     // 在构造函数中初始化数据库
     this.db = new Level(this._path, { valueEncoding: 'json' });
@@ -144,14 +146,11 @@ namespace LevelDBCache
 {
   export interface Config
   {
-    path?: string;
+    debug: boolean;
   }
 
   export const Config: Schema<Config> = Schema.object({
-    path: Schema.path({
-      filters: ['directory'],
-      allowCreate: true,
-    }).description('缓存数据库的路径').default('data/cache/leveldb'),
+    debug: Schema.boolean().description('是否输出调试日志。').default(false),
   });
 }
 
