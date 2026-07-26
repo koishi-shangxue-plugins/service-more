@@ -8,10 +8,14 @@
     "lib",
     "src"
   ],
-  "homepage": "https://github.com/koishi-shangxue-plugins/koishi-shangxue-apps/tree/main/",
-  "bugs": {
-    "url": "https://github.com/koishi-shangxue-plugins/koishi-shangxue-apps/issues"
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/koishi-shangxue-plugins/service-more.git"
   },
+  "bugs": {
+    "url": "https://github.com/koishi-shangxue-plugins/service-more/issues"
+  },
+  "homepage": "https://github.com/koishi-shangxue-plugins/service-more",
   "license": "MIT",
   "keywords": [
     "bot",
