@@ -29,7 +29,7 @@
     "category": "storage",
     "description": {
       "en": "Serve assets on QQ Bot by multipart upload",
-      "zh": "鍩轰簬 QQ 鏈哄櫒浜哄垎鐗囦笂浼犵殑璧勬簮杞瓨鏈嶅姟"
+      "zh": ""
     },
     "service": {
       "implements": [
