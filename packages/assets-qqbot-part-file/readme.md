@@ -1,4 +1,6 @@
-# assets-qqbot-part-file
+# koishi-plugin-assets-qqbot-part-file
+
+[![npm](https://img.shields.io/npm/v/koishi-plugin-assets-qqbot-part-file?style=flat-square)](https://www.npmjs.com/package/koishi-plugin-assets-qqbot-part-file)
 
 QQ 机器人分片上传版 `assets` 服务。
 
