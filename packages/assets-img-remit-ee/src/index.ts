@@ -17,7 +17,6 @@ class RemitAssets extends Assets<RemitAssets.Config>
       endpoint: config.endpoint,
       headers: {
         accept: 'application/json',
-        origin: config.baseUrl,
         referer: `${config.baseUrl}/`,
       },
     });
@@ -88,7 +87,6 @@ class RemitAssets extends Assets<RemitAssets.Config>
 
       const response = await this.http.post('/upload', payload, {
         headers: {
-          origin: this.config.baseUrl,
           referer: `${this.config.baseUrl}/`,
         },
       });
