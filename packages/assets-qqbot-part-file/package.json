@@ -1,0 +1,49 @@
+{
+  "name": "koishi-plugin-assets-qqbot-part-file",
+  "description": "Serve assets on QQ Bot by multipart upload",
+  "version": "0.1.0",
+  "main": "lib/index.js",
+  "typings": "lib/index.d.ts",
+  "files": [
+    "lib",
+    "src"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/koishi-shangxue-plugins/service-more.git"
+  },
+  "bugs": {
+    "url": "https://github.com/koishi-shangxue-plugins/service-more/issues"
+  },
+  "homepage": "https://github.com/koishi-shangxue-plugins/service-more",
+  "license": "MIT",
+  "keywords": [
+    "bot",
+    "chatbot",
+    "koishi",
+    "plugin",
+    "assets",
+    "qq"
+  ],
+  "koishi": {
+    "category": "storage",
+    "description": {
+      "en": "Serve assets on QQ Bot by multipart upload",
+      "zh": "鍩轰簬 QQ 鏈哄櫒浜哄垎鐗囦笂浼犵殑璧勬簮杞瓨鏈嶅姟"
+    },
+    "service": {
+      "implements": [
+        "assets"
+      ]
+    }
+  },
+  "peerDependencies": {
+    "koishi": "^4.17.7"
+  },
+  "devDependencies": {
+    "koishi": "^4.17.7"
+  },
+  "dependencies": {
+    "@koishijs/assets": "^1.1.2"
+  }
+}
