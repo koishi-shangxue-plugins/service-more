@@ -2,7 +2,6 @@
   "extends": "./tsconfig.base",
   "compilerOptions": {
     "baseUrl": ".",
-    "ignoreDeprecations": "6.0",
     "paths": {
       "koishi-plugin-database-*": [ "packages/database-*/src" ],
       "koishi-plugin-cache-*": [ "packages/cache-*/src" ],
