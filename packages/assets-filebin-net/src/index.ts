@@ -1,54 +1,60 @@
-import { Context, HTTP, Schema } from 'koishi'
-import Assets from '@koishijs/assets'
-import { } from '@koishijs/plugin-http'
+import { Context, HTTP, Schema } from 'koishi';
+import Assets from '@koishijs/assets';
+import { } from '@koishijs/plugin-http';
 
-import { createHash } from 'node:crypto'
+import { createHash } from 'node:crypto';
 
-export const name = 'assets-filebin-net'
+export const name = 'assets-filebin-net';
 
-class FilebinAssets extends Assets<FilebinAssets.Config> {
-  types = ['image', 'img', 'audio', 'video', 'file'] // 支持所有类型
-  http: HTTP
+class FilebinAssets extends Assets<FilebinAssets.Config>
+{
+  types = ['image', 'img', 'audio', 'video', 'file']; // 支持所有类型
+  http: HTTP;
 
-  constructor(ctx: Context, config: FilebinAssets.Config) {
-    super(ctx, config)
+  constructor(ctx: Context, config: FilebinAssets.Config)
+  {
+    super(ctx, config);
     this.http = ctx.http.extend({
       headers: { accept: 'application/json' },
-    })
-    this.logInfo(`初始化完成 - 基础地址: ${config.endpoint}, seed: ${config.seed}`)
+    });
+    this.logInfo(`初始化完成 - 基础地址: ${config.endpoint}, seed: ${config.seed}`);
   }
 
-  private logInfo(...args: any[]) {
-    if (this.config.loggerinfo) {
+  private logInfo(...args: any[])
+  {
+    if (this.config.loggerinfo)
+    {
       const logger = this.ctx.logger('assets-filebin-net')
-        ; (logger.info as (...args: any[]) => void)(...args)
+        ; (logger.info as (...args: any[]) => void)(...args);
     }
   }
 
-  async upload(url: string, file: string) {
-    const { buffer, filename, type } = await this.analyze(url, file)
-    const logger = this.ctx.logger('assets-filebin-net')
+  async upload(url: string, file: string)
+  {
+    const { buffer, filename, type } = await this.analyze(url, file);
+    const logger = this.ctx.logger('assets-filebin-net');
 
-    try {
+    try
+    {
       // 融合日期、时间戳、用户seed和随机数，生成唯一值
-      const uniqueSeed = `${new Date().toISOString()}${Date.now()}${this.config.seed}${Math.random().toString(36)}`
+      const uniqueSeed = `${new Date().toISOString()}${Date.now()}${this.config.seed}${Math.random().toString(36)}`;
       // 使用 MD5 哈希处理，确保每次上传的 bin 都不同，避免空间不足
-      const bin = createHash('md5').update(uniqueSeed).digest('hex')
+      const bin = createHash('md5').update(uniqueSeed).digest('hex');
 
       // 生成随机文件名
-      const randomName = Math.random().toString(36).slice(-8)
-      const uploadUrl = `${this.config.endpoint}/${bin}/${randomName}`
+      const randomName = Math.random().toString(36).slice(-8);
+      const uploadUrl = `${this.config.endpoint}/${bin}/${randomName}`;
 
-      this.logInfo(`开始上传文件: ${filename}, 类型: ${type}, 目标URL: ${uploadUrl}`)
+      this.logInfo(`开始上传文件: ${filename}, 类型: ${type}, 目标URL: ${uploadUrl}`);
 
       // 上传文件
       await this.http.post(uploadUrl, buffer, {
         headers: {
           'Content-Type': 'application/octet-stream',
         },
-      })
+      });
 
-      this.logInfo(`文件上传完成，获取访问链接...`)
+      this.logInfo(`文件上传完成，获取访问链接...`);
 
       // 获取重定向地址
       const response = await this.http(uploadUrl, {
@@ -57,40 +63,46 @@ class FilebinAssets extends Assets<FilebinAssets.Config> {
         headers: {
           cookie: 'verified=2024-05-24',
         },
-      })
+      });
 
-      const location = response.headers.get('location')
-      if (!location) {
-        throw new Error('无法获取文件访问链接')
+      const location = response.headers.get('location');
+      if (!location)
+      {
+        throw new Error('无法获取文件访问链接');
       }
 
-      const finalUrl = `${location}#${filename}`
-      this.logInfo(`上传成功: ${finalUrl}`)
-      return finalUrl
-    } catch (error) {
-      const err = error instanceof Error ? error : new Error(String(error))
+      const finalUrl = `${location}#${filename}`;
+      this.logInfo(`上传成功: ${finalUrl}`);
+      return finalUrl;
+    } catch (error)
+    {
+      const err = error instanceof Error ? error : new Error(String(error));
       // 捕获并处理“存储空间不足”的错误
-      if (err.message.includes('Insufficient Storage')) {
-        const friendlyError = new Error('filebin.net 存储空间不足。插件已自动尝试使用新的存储空间，请重试。如果问题依然存在，请考虑更换 seed 配置或等待一段时间。')
-        logger.error(`上传失败: ${friendlyError.message}`)
-        throw friendlyError
+      if (err.message.includes('Insufficient Storage'))
+      {
+        const friendlyError = new Error('filebin.net 存储空间不足。插件已自动尝试使用新的存储空间，请重试。如果问题依然存在，请考虑更换 seed 配置或等待一段时间。');
+        logger.error(`上传失败: ${friendlyError.message}`);
+        throw friendlyError;
       }
-      logger.error(`上传失败: ${err.message}`)
-      throw err
+      logger.error(`上传失败: ${err.message}`);
+      throw err;
     }
   }
 
-  async stats() {
+  async stats()
+  {
     // filebin.net 没有提供统计信息接口，返回空对象
-    return {}
+    return {};
   }
 }
 
-namespace FilebinAssets {
-  export interface Config extends Assets.Config {
-    endpoint: string
-    seed: string
-    loggerinfo: boolean
+namespace FilebinAssets
+{
+  export interface Config extends Assets.Config
+  {
+    endpoint: string;
+    seed: string;
+    loggerinfo: boolean;
   }
 
   export const Config: Schema<Config> = Schema.intersect([
@@ -109,11 +121,11 @@ namespace FilebinAssets {
         .experimental(),
     }),
     Assets.Config,
-  ])
+  ]);
 
   export const usage = `
   ---
-  
+
   要使用本插件提供的 assets 服务，你需要先关闭默认开启的 assets-local 插件，然后开启本插件。
 
   ---
@@ -127,16 +139,17 @@ namespace FilebinAssets {
 
   本插件后端服务来自: <a href="https://filebin.net" target="_blank">https://filebin.net</a>
 
-  ---  
-  `
+  ---
+  `;
 }
 
 export interface Config extends FilebinAssets.Config { }
 
-export const Config = FilebinAssets.Config
+export const Config = FilebinAssets.Config;
 
-export function apply(ctx: Context, config: Config) {
-  ctx.plugin(FilebinAssets, config)
+export function apply(ctx: Context, config: Config)
+{
+  ctx.plugin(FilebinAssets, config);
 }
 
-export default FilebinAssets
+export default FilebinAssets;

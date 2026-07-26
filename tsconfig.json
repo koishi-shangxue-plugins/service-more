@@ -9,6 +9,13 @@
       "koishi-plugin-glyph": [ "packages/glyph/src" ],
     },
   },
+  "files": [ ],
+  "references": [
+    { "path": "./packages/assets-xinyewapi" },
+    { "path": "./packages/assets-chevereto-fork" },
+    { "path": "./packages/assets-filebin-net" },
+    { "path": "./packages/assets-img-remit-ee" }
+  ],
   "exclude": [
     "**/lib",
     "**/dist",
