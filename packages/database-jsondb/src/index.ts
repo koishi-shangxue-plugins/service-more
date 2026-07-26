@@ -23,7 +23,7 @@ function parseLegacyIndexes(content: string) {
 }
 
 class JsonDBDriver extends Driver {
-  static name = 'jsondb'
+  static loggerName = 'jsondb'
   static inject = ['logger']
 
   private readonly basePath: string
@@ -38,7 +38,7 @@ class JsonDBDriver extends Driver {
 
   constructor(public ctx: Context, public config: JsonDBDriver.Config) {
     super(ctx, config)
-    this.logger = ctx.logger(JsonDBDriver.name)
+    this.logger = ctx.logger(JsonDBDriver.loggerName)
     this.basePath = resolve(ctx.baseDir, DATABASE_PATH)
     this.fileDriver = new DatabaseFileDriver({
       dir: this.basePath,
