@@ -15,7 +15,11 @@ class RemitAssets extends Assets<RemitAssets.Config>
     super(ctx, config);
     this.http = ctx.http.extend({
       endpoint: config.endpoint,
-      headers: { accept: 'application/json' },
+      headers: {
+        accept: 'application/json',
+        origin: config.baseUrl,
+        referer: `${config.baseUrl}/`,
+      },
     });
     this.logInfo(`初始化完成，API地址: ${config.endpoint}`);
   }
@@ -82,7 +86,12 @@ class RemitAssets extends Assets<RemitAssets.Config>
 
       this.logInfo(`开始上传文件: ${filename}, 类型: ${type}, 实际文件名: ${uploadFilename}`);
 
-      const response = await this.http.post('/upload', payload);
+      const response = await this.http.post('/upload', payload, {
+        headers: {
+          origin: this.config.baseUrl,
+          referer: `${this.config.baseUrl}/`,
+        },
+      });
       this.logInfo(`API响应: ${JSON.stringify(response)}`);
 
       if (response && typeof response === 'object')
