@@ -7,7 +7,7 @@ export const name = 'assets-img-remit-ee';
 
 class RemitAssets extends Assets<RemitAssets.Config>
 {
-  types = ['image', 'img', "video"];
+  types = ['image', 'img', 'video'];
   http: HTTP;
 
   constructor(ctx: Context, config: RemitAssets.Config)
@@ -36,12 +36,20 @@ class RemitAssets extends Assets<RemitAssets.Config>
       'image/png': '.png',
       'image/gif': '.gif',
       'image/webp': '.webp',
+      'image/bmp': '.bmp',
+      'image/tiff': '.tiff',
       'application/pdf': '.pdf',
+      'video/mp4': '.mp4',
+      'video/webm': '.webm',
+      'video/quicktime': '.mov',
     };
     const expectedExt = extMap[type];
     const currentExt = extname(filename);
 
-    if (!expectedExt || currentExt.toLowerCase() === expectedExt) return filename;
+    if (!expectedExt || currentExt.toLowerCase() === expectedExt)
+    {
+      return filename;
+    }
 
     // 临时修正后缀，绕过服务端的扩展名校验
     return currentExt ? filename.slice(0, -currentExt.length) + expectedExt : filename + expectedExt;
@@ -59,6 +67,12 @@ class RemitAssets extends Assets<RemitAssets.Config>
   {
     const { buffer, filename, type } = await this.analyze(url, file);
     const logger = this.ctx.logger('assets-img-remit-ee');
+    const maxSize = 20 * 1024 * 1024;
+
+    if (buffer.byteLength > maxSize)
+    {
+      throw new Error('文件超过 20MB，img.remit.ee 不支持上传');
+    }
 
     try
     {
