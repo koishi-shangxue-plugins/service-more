@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
-import { extname } from 'node:path';
-import { Context, Schema } from 'koishi';
+import { basename, extname } from 'node:path';
+import { Context, Schema, h } from 'koishi';
 import Assets from '@koishijs/assets';
 import { } from '@koishijs/plugin-http';
 
@@ -9,6 +9,8 @@ export const name = 'assets-qqbot-part-file';
 const QQ_API = 'https://api.sgroup.qq.com';
 const QQ_TOKEN_API = 'https://bots.qq.com/app/getAppAccessToken';
 const MAX_SIZE = 30 * 1024 * 1024;
+
+type OpenidFilesMode = 'group' | 'user';
 
 interface AccessTokenResponse
 {
@@ -32,11 +34,23 @@ interface UploadPrepareResult
 
 interface UploadFinishResult
 {
-  file_uuid?: string;
-  file_info?: string;
-  ttl?: number;
-  id?: string;
   raw_url?: string;
+}
+
+interface ElementData
+{
+  src: string;
+  file?: string;
+  [key: string]: unknown;
+}
+
+interface UploadTarget
+{
+  mode: OpenidFilesMode;
+  openid: string;
+  filesPath: string;
+  preparePath: string;
+  finishPath: string;
 }
 
 const MIME_TO_EXT: Record<string, string> = {
@@ -51,6 +65,7 @@ const MIME_TO_EXT: Record<string, string> = {
   'video/mp4': '.mp4',
   'video/webm': '.webm',
   'video/quicktime': '.mov',
+  'audio/mp4': '.m4a',
   'audio/mpeg': '.mp3',
   'audio/mp3': '.mp3',
   'audio/wav': '.wav',
@@ -83,43 +98,96 @@ class QQBotPartFileAssets extends Assets<QQBotPartFileAssets.Config>
   private debug(...args: string[])
   {
     if (!this.config.debug) return;
-    this.ctx.logger(name).info(args.join(' '));
+    this.ctx.logger(name).info(`[debug] ${args.join(' ')}`);
   }
 
-  private fail(message: string, error?: unknown): never
+  async transform(content: string)
   {
-    if (error instanceof Error)
+    const map: Record<string, (data: ElementData) => Promise<ReturnType<typeof h>>> = {};
+
+    for (const type of this.types)
     {
-      this.ctx.logger(name).error(`${message}: ${error.message}`);
-    } else if (typeof error !== 'undefined')
-    {
-      this.ctx.logger(name).error(`${message}: ${this.describe(error)}`);
-    } else
-    {
-      this.ctx.logger(name).error(message);
+      map[type] = async (data) =>
+      {
+        if (this.config.whitelist?.some((prefix) => data.src.startsWith(prefix)))
+        {
+          return h(type, data);
+        }
+
+        const sourceFile = this.getPreferredSourceFile(data.src, data.file);
+        return h(type, { ...data, src: await this.upload(data.src, sourceFile, type) });
+      };
     }
-    throw error instanceof Error ? error : new Error(message);
+
+    return await h.transformAsync(content, map);
   }
 
-  private describe(value: unknown)
+  private getUploadTarget(): UploadTarget
   {
-    if (typeof value === 'string') return value;
+    // 根据配置切换群聊或私聊上传接口
+    if (this.config.openid_files_mode === 'group')
+    {
+      if (!this.config.groupId)
+      {
+        throw new Error('openid_files_mode=group 时必须配置 groupId');
+      }
+
+      return {
+        mode: 'group',
+        openid: this.config.groupId,
+        filesPath: `/v2/groups/${this.config.groupId}/files`,
+        preparePath: `/v2/groups/${this.config.groupId}/upload_prepare`,
+        finishPath: `/v2/groups/${this.config.groupId}/upload_part_finish`,
+      };
+    }
+
+    if (!this.config.userId)
+    {
+      throw new Error('openid_files_mode=user 时必须配置 userId');
+    }
+
+    return {
+      mode: 'user',
+      openid: this.config.userId,
+      filesPath: `/v2/users/${this.config.userId}/files`,
+      preparePath: `/v2/users/${this.config.userId}/upload_prepare`,
+      finishPath: `/v2/users/${this.config.userId}/upload_part_finish`,
+    };
+  }
+
+  private getPreferredSourceFile(src: string, file?: string)
+  {
+    const sourceName = this.getSourceFilename(src);
+    if (this.hasKnownExtension(sourceName)) return sourceName;
+    if (file && this.hasKnownExtension(basename(file))) return basename(file);
+    return sourceName || file || src;
+  }
+
+  private getSourceFilename(url: string)
+  {
     try
     {
-      return JSON.stringify(value);
+      return basename(new URL(url).pathname) || url;
     } catch
     {
-      return String(value);
+      return basename(url) || url;
     }
+  }
+
+  private hasKnownExtension(name: string)
+  {
+    const ext = extname(name).toLowerCase();
+    return [
+      '.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.tif', '.tiff', '.svg',
+      '.mp4', '.webm', '.mov', '.mkv', '.m4v',
+      '.mp3', '.m4a', '.aac', '.wav', '.ogg', '.flac', '.silk',
+    ].includes(ext);
   }
 
   private getClientSecret()
   {
     const secret = this.config.appSecret;
-    if (!secret)
-    {
-      throw new Error('缺少 QQ 机器人的 clientSecret');
-    }
+    if (!secret) throw new Error('缺少 QQ 机器人的 clientSecret');
     return secret;
   }
 
@@ -206,10 +274,9 @@ class QQBotPartFileAssets extends Assets<QQBotPartFileAssets.Config>
       }
     }
 
-    if (buffer.length >= 4)
+    if (buffer.length >= 4 && buffer.subarray(0, 4).toString('hex') === '1a45dfa3')
     {
-      const head = buffer.subarray(0, 4).toString('hex');
-      if (head === '1a45dfa3') return 'video/webm';
+      return 'video/webm';
     }
 
     if (buffer.length >= 2 && buffer[0] === 0x42 && buffer[1] === 0x4d)
@@ -269,19 +336,56 @@ class QQBotPartFileAssets extends Assets<QQBotPartFileAssets.Config>
     }
   }
 
-  private resolveMime(buffer: Buffer, filename: string, declaredType?: string)
+  private mimeFromSourceUrl(url: string)
   {
+    try
+    {
+      const parsed = new URL(url);
+      return this.mimeFromFilename(parsed.pathname);
+    } catch
+    {
+      return this.mimeFromFilename(url);
+    }
+  }
+
+  private resolveMime(buffer: Buffer, sourceUrl: string, filename: string, declaredType?: string, kind?: string)
+  {
+    const sourceMime = this.mimeFromSourceUrl(sourceUrl);
     const sniffed = this.sniffMime(buffer);
+
+    // 元素类型优先，避免 audio/video 互相误判。
+    if (kind === 'audio')
+    {
+      if (sourceMime?.startsWith('audio/')) return sourceMime;
+      if (sniffed?.startsWith('audio/')) return sniffed;
+      if (sourceMime?.startsWith('video/') || sniffed?.startsWith('video/')) return 'audio/mp4';
+    } else if (kind === 'video')
+    {
+      if (sourceMime?.startsWith('video/')) return sourceMime;
+      if (sniffed?.startsWith('video/')) return sniffed;
+    } else if (kind === 'image')
+    {
+      if (sourceMime?.startsWith('image/')) return sourceMime;
+      if (sniffed?.startsWith('image/')) return sniffed;
+    }
+
     if (sniffed) return sniffed;
+    if (sourceMime) return sourceMime;
+
+    const nameMime = this.mimeFromFilename(filename);
+    if (nameMime) return nameMime;
 
     const normalized = declaredType?.trim().toLowerCase();
     if (normalized && normalized !== 'application/octet-stream') return normalized;
-
-    return this.mimeFromFilename(filename);
+    return undefined;
   }
 
-  private resolveFileType(filename: string, mime?: string)
+  private resolveFileType(filename: string, mime?: string, kind?: string)
   {
+    if (kind === 'image') return 1;
+    if (kind === 'video') return 2;
+    if (kind === 'audio') return 3;
+
     const lowerMime = mime?.toLowerCase();
     if (lowerMime?.startsWith('image/')) return 1;
     if (lowerMime?.startsWith('video/')) return 2;
@@ -321,12 +425,25 @@ class QQBotPartFileAssets extends Assets<QQBotPartFileAssets.Config>
     }
   }
 
-  async upload(url: string, file: string)
+  private describe(value: unknown)
+  {
+    if (typeof value === 'string') return value;
+    try
+    {
+      return JSON.stringify(value);
+    } catch
+    {
+      return String(value);
+    }
+  }
+
+  async upload(url: string, file: string, kind?: string)
   {
     const { buffer, filename, type } = await this.analyze(url, file);
-    const mime = this.resolveMime(buffer, filename, type);
+    const target = this.getUploadTarget();
+    const mime = this.resolveMime(buffer, url, filename, type, kind);
     const uploadFilename = this.resolveUploadFilename(filename, mime);
-    const fileType = this.resolveFileType(uploadFilename, mime);
+    const fileType = this.resolveFileType(uploadFilename, mime, kind);
 
     if (buffer.byteLength > MAX_SIZE)
     {
@@ -335,7 +452,7 @@ class QQBotPartFileAssets extends Assets<QQBotPartFileAssets.Config>
 
     await this.getAccessToken();
 
-    const prepare = await this.api.post(`/v2/groups/${this.config.groupId}/upload_prepare`, {
+    const prepare = await this.api.post(target.preparePath, {
       file_type: fileType,
       file_size: buffer.byteLength,
       file_name: uploadFilename,
@@ -352,7 +469,7 @@ class QQBotPartFileAssets extends Assets<QQBotPartFileAssets.Config>
       throw new Error(`QQ upload_prepare 返回异常: ${this.describe(prepare)}`);
     }
 
-    this.debug(`开始上传 ${filename} -> ${uploadFilename}`, `mime=${mime || 'unknown'}`, `parts=${parts.length}`);
+    this.debug(`开始上传 ${filename} -> ${uploadFilename}`, `mode=${target.mode}`, `kind=${kind || 'unknown'}`, `mime=${mime || 'unknown'}`, `parts=${parts.length}`);
 
     for (const part of parts)
     {
@@ -366,7 +483,7 @@ class QQBotPartFileAssets extends Assets<QQBotPartFileAssets.Config>
         },
       });
 
-      await this.api.post(`/v2/groups/${this.config.groupId}/upload_part_finish`, {
+      await this.api.post(target.finishPath, {
         upload_id: uploadId,
         part_index: part.index,
         block_size: String(chunk.length),
@@ -376,20 +493,19 @@ class QQBotPartFileAssets extends Assets<QQBotPartFileAssets.Config>
       this.debug(`part_${part.index} uploaded`, this.buildPublicUrl(part.presigned_url, mime));
     }
 
-    const merged = await this.api.post(`/v2/groups/${this.config.groupId}/files`, {
+    const merged = await this.api.post(target.filesPath, {
       file_type: fileType,
       srv_send_msg: false,
       file_name: uploadFilename,
       upload_id: uploadId,
     }) as UploadFinishResult;
 
-    const rawUrl = merged?.raw_url;
-    if (!rawUrl)
+    if (!merged?.raw_url)
     {
       throw new Error(`QQ 分片上传完成后未返回 raw_url: ${this.describe(merged)}`);
     }
 
-    const finalUrl = this.buildPublicUrl(rawUrl, mime);
+    const finalUrl = this.buildPublicUrl(merged.raw_url, mime);
     this.debug(`uploaded ${filename} -> ${finalUrl}`);
     return finalUrl;
   }
@@ -406,7 +522,9 @@ namespace QQBotPartFileAssets
   {
     appid: string;
     appSecret: string;
-    groupId: string;
+    openid_files_mode: OpenidFilesMode;
+    groupId?: string;
+    userId?: string;
     debug: boolean;
   }
 
@@ -419,19 +537,35 @@ namespace QQBotPartFileAssets
         .description('QQ 机器人 AppSecret')
         .role('secret')
         .required(),
-      groupId: Schema.string()
-        .description('用于上传文件的群 OpenID<br>请使用inspect指令查看群组openId，任意QQ群组即可')
-        .required(),
+    }).description('基础配置'),
+
+    Schema.object({
+      openid_files_mode: Schema.union(['group', 'user']).default('user').description('文件上传模式'),
+    }).description('上传配置'),
+
+    Schema.union([
+      Schema.object({
+        openid_files_mode: Schema.const('group').required(),
+        groupId: Schema.string().description('用于上传文件的群 OpenID').required(),
+      }),
+      Schema.object({
+        openid_files_mode: Schema.const('user'),
+        userId: Schema.string().description('用于上传文件的用户 OpenID').required(),
+      }),
+    ]),
+
+    Schema.object({
       debug: Schema.boolean()
         .default(false)
         .description('开启后输出调试日志')
         .experimental(),
-    }),
+    }).description('调试配置'),
+
     Assets.Config,
   ]);
 }
 
-export interface Config extends QQBotPartFileAssets.Config { }
+export type Config = QQBotPartFileAssets.Config;
 
 export const Config = QQBotPartFileAssets.Config;
 
